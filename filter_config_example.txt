@@ -1,0 +1,7 @@
+flux_lim=1e-3
+SNR=0
+ratio_frac=0
+reject_blends=True
+flags=False
+psf_tol=1.5
+resid_tol=3

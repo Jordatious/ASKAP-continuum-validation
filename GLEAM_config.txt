@@ -1,0 +1,10 @@
+filename=GLEAM.fits
+name=GLEAM
+frequency=201
+finder=aegean
+search_rad=30
+ra_col=RAJ2000
+dec_col=DEJ2000
+col_suffix=_wide
+use_peak=False
+autoload=True
