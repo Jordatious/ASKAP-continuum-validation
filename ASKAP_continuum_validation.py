@@ -29,13 +29,13 @@ Options:
   -w --write                Write intermediate files generated during processing (e.g. cross-matched and pre-filtered catalogues, etc).
                             This will save having to reprocess the cross-matches, etc when executing the script again. [default: False].
   -x --no-write             Don't write any files except the html report (without figures) and any files output from BANE and Aegean. [default: False].
-  -m --SEDs=<models>        A comma-separated list of SED models to fit to the radio spectra ('pow','SSA','FFA','curve',etc) [default: pow,powCIbreak,SSA].
+  -m --SEDs=<models>        A comma-separated list of SED models to fit to the radio spectra ('pow','SSA','FFA','curve',etc) [default: None].
   -e --SEDfig=<extn>        Write figures for each SED model with this file extension (will significantly slow down script) [default: None].
   -d --main-dir=<path>      The absolute path to the main directory where this script and other required files are located [default: $ACES/UserScripts/col52r].
   -n --ncores=<num>         The number of cores (per node) to use when running BANE and Aegean (using >=20 cores may result in memory error) [default: 8].
   -b --nbins=<num>          The number of bins to use when performing source counts [default: 50].
   -s --source=<src>         The format for writing plots (e.g. screen, html, eps, pdf, png, etc) [default: html].
-  -a --aegean=<params>      A single string with any extra paramters to pass into Aegean (except cores, noise, background, and table) [default: --floodclip=3]."""
+  -a --aegean=<params>      A single string with extra paramters to pass into Aegean (except cores, noise, background, and table) [default: --floodclip=3]."""
 
 from __future__ import division
 from docopt import docopt
@@ -1356,7 +1356,7 @@ class catalogue(object):
         self.use_peak = use_peak
 
         if self.flux_unit not in ('jy','mjy','ujy'):
-            warnings.warn_explicit("Unrecognised flux unit '{0}'. Please use 'Jy', 'mJy' or 'uJy'.Assuming 'Jy'\n".format(flux_unit),UserWarning,WARN,cf.f_lineno)
+            warnings.warn_explicit("Unrecognised flux unit '{0}'. Use 'Jy', 'mJy' or 'uJy'. Assuming 'Jy'\n".format(flux_unit),UserWarning,WARN,cf.f_lineno)
             self.flux_unit = 'jy'
 
         #keep a running list of key values for all sources, as a dictionary with key 'name'
@@ -2025,8 +2025,8 @@ class catalogue(object):
         Keyword arguments:
         ------------------
         cat_name : string
-            Derive spectral indices between the catalogue given by this dictionary key and the main catalogue from this instance. If None is input,
-            all data except the catalogue from this instance will be used, and the flux at its frequency will be derived. If 'all' is input, all data will be used.
+            Derive spectral indices between the catalogue given by this dictionary key and the main catalogue from this instance. If None is input, all data
+            except the catalogue from this instance will be used, and the flux at its frequency will be derived. If 'all' is input, all data will be used.
         match_perc : float
             Don't use the fluxes from a catalogue if the number of sources is less than this percentage of the main catalogue.
             Only used when cat_name is None. Use 0 to accept all catalogues.
@@ -2526,7 +2526,9 @@ class report(object):
             A radio image object used to write values to the html table."""
 
         #generate link to confluence page for each project code
-        project = self.add_html_link("https://confluence.csiro.au/display/askapsst/{0}+Data".format(img.project),img.project,file=False)
+        project = img.project
+        if project.startswith('AS'):
+            project = self.add_html_link("https://confluence.csiro.au/display/askapsst/{0}+Data".format(img.project),img.project,file=False)
         flux_type = 'integrated'
         if self.cat.use_peak:
             flux_type = 'peak'
@@ -3633,14 +3635,14 @@ class report(object):
                 flux_ratio_type = name2
             elif fitted_ratio_col in self.cat.df.columns:
                 ratio = self.cat.df[fitted_ratio_col]
-                flux_ratio_type = '{0} extrapolation'.format(name2)
+                flux_ratio_type = '{0}-extrapolated'.format(name2)
 
             logRatio = np.log10(ratio)
 
             #plot the flux ratio as a function of S/N
             fig = plt.figure(**self.fig_size)
 
-            title = "{0} / {1} {2} MHz flux ratio".format(name1,flux_ratio_type,freq)
+            title = "{0} / {1} flux ratio".format(name1,flux_ratio_type)
             xlabel = 'S/N'
             ylabel = 'Flux Density Ratio'
             clabel = 'Declination'
@@ -3880,6 +3882,11 @@ snr = float(args['--snr'])
 config_files = args['--catalogues'].split(',')
 SEDs = args['--SEDs'].split(',')
 SEDextn = parse_string(args['--SEDfig'])
+if args['--SEDs'] == 'None':
+    SEDs = 'pow'
+    fit_flux=False
+else:
+    fit_flux=True
 
 #force write_all=False write_any=False
 if not write_any:
@@ -3953,7 +3960,7 @@ if __name__ == "__main__":
     #Fit radio SED models using all fluxes except
     #ASKAP, and derive the flux at ASKAP frequency
     if len(AKcat.cat_list) > 1:
-        AKcat.fit_spectra(redo=redo,models=SEDs,GLEAM_subbands='int',GLEAM_nchans=4,cat_name=None,write=write_any,fig_extn=SEDextn)
+        AKcat.fit_spectra(redo=redo,models=SEDs,GLEAM_subbands='int',GLEAM_nchans=4,cat_name=None,write=write_any,fit_flux=fit_flux,fig_extn=SEDextn)
 
     print "----------------------------"
     print "| Running validation tests |"
