@@ -92,7 +92,7 @@ main_dir = args['--main-dir']
 if main_dir.startswith('$ACES') and 'ACES' in os.environ.keys():
     ACES = os.environ['ACES']
     main_dir = main_dir.replace('$ACES',ACES)
-elif not os.path.exists('{0}/requirements.txt'.format(main_dir)):
+if not os.path.exists('{0}/requirements.txt'.format(main_dir)):
     split = sys.argv[0].split('/')
     script_dir = '/'.join(split[:-1])
     print "Looking in '{0}' for necessary files.".format(script_dir)
@@ -2491,7 +2491,7 @@ class report(object):
                             ('Positional Offset' , 0),
                             ('Positional Offset Uncertainty' , 0),
                             ('Resolved Fraction' , self.cat.resolved_frac),
-                            ('Spectral Index' , -99),
+                            ('Spectral Index' , 0),
                             ('Source Counts Reduced Chi-squared' , self.sc_red_chi_sq),
                             ('RA Offset' , 0),
                             ('DEC Offset' , 0)]
@@ -3974,3 +3974,4 @@ if __name__ == "__main__":
     #and append validation metrics to html file and then close it
     AKreport.write_pipeline_offset_params()
     AKreport.write_html_end()
+    
