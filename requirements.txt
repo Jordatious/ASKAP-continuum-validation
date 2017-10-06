@@ -1,5 +1,4 @@
 AegeanTools
-aplpy
 astropy
 docopt
 matplotlib>=2.0.0
