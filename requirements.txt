@@ -1,9 +1,8 @@
-AegeanTools
-aplpy
+git+https://github.com/PaulHancock/Aegean.git
 astropy
 docopt
 matplotlib>=2.0.0
-mpld3
+git+https://github.com/mpld3/mpld3.git
 numpy
 pandas
 seaborn
