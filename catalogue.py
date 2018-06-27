@@ -326,30 +326,49 @@ class catalogue(object):
         img : radio_image
             A radio_image object corresponding to this catalogue, which is used to calculate various quantities."""
 
-        #Get area of non-nan pixels of image
-        self.area = img.area
-        self.ra_bounds = img.ra_bounds
-        self.dec_bounds = img.dec_bounds
+        if img is not None:
+            #Get area of non-nan pixels of image
+            self.area = img.area
+            self.ra_bounds = img.ra_bounds
+            self.dec_bounds = img.dec_bounds
 
-        #Get dynamic range between image and rms map and sum of image flux vs. total catalogue flux
-        rms_map = f.open(img.rms_map)[0]
-        img_data = img.fits.data
-        if self.finder == 'aegean':
-            img_data = img_data[0][0]
-        self.img_peak = np.max(img_data[~np.isnan(img_data)])
-        self.rms_bounds = rms_map.data > 0
-        self.img_rms = int(np.median(rms_map.data[self.rms_bounds])*1e6) #uJy
-        self.img_peak_bounds = np.max(img_data[self.rms_bounds])
-        self.img_peak_pos = np.where(img_data == self.img_peak_bounds)
-        self.img_peak_rms = rms_map.data[self.img_peak_pos][0]
-        self.dynamic_range = self.img_peak_bounds/self.img_peak_rms
+            #Get dynamic range between image and rms map and sum of image flux vs. total catalogue flux
+            rms_map = f.open(img.rms_map)[0]
+            img_data = img.fits.data
+            if self.finder == 'aegean':
+                img_data = img_data[0][0]
+            self.img_peak = np.max(img_data[~np.isnan(img_data)])
+            self.rms_bounds = rms_map.data > 0
+            self.img_rms = int(np.median(rms_map.data[self.rms_bounds])*1e6) #uJy
+            self.img_peak_bounds = np.max(img_data[self.rms_bounds])
+            self.img_peak_pos = np.where(img_data == self.img_peak_bounds)
+            self.img_peak_rms = rms_map.data[self.img_peak_pos][0]
+            self.dynamic_range = self.img_peak_bounds/self.img_peak_rms
+            self.img_flux = np.sum(img_data[~np.isnan(img_data)]) / (1.133*((img.bmaj * img.bmin) / (img.raPS * img.decPS))) #divide by beam area
+
+        #Get the approximate area from catalogue
+        else:
+            if self.name not in self.coords.keys():
+                self.set_key_fields()
+            self.ra_bounds = (max(self.ra[self.name]),min(self.ra[self.name]))
+            dRA = (self.ra_bounds[0] - self.ra_bounds[1])*np.cos(np.deg2rad(np.mean(self.dec[self.name])))
+            self.dec_bounds = (max(self.dec[self.name]),min(self.dec[self.name]))
+            dDEC = abs(self.dec_bounds[0] - self.dec_bounds[1])
+            self.area = dRA*dDEC
+            self.img_peak = np.max(self.flux[self.name])
+            self.img_rms = int(np.median(self.rms[self.name])*1e6) #uJy
+            self.dynamic_range = self.img_peak/self.img_rms
+            self.img_flux = np.nan
+
         self.blends = len(np.where(self.df[self.island_col].value_counts() > 1)[0])
-        self.img_flux = np.sum(img_data[~np.isnan(img_data)]) / (1.133*((img.bmaj * img.bmin) / (img.raPS * img.decPS))) #divide by beam area
         self.cat_flux = np.sum(self.flux[self.name])
+
+        #get median spectral index if column exists
         if self.name in self.si.keys():
             self.med_si = np.median(self.si[self.name])
         else:
             self.med_si = -99
+
         if self.verbose:
             print "Sum of flux in image is {0:.3f} Jy and sum of all fitted gaussians is {1:.3f} Jy.".format(self.img_flux,self.cat_flux)
             print "Image peak is {0:.2f} Jy.".format(self.img_peak)
@@ -357,6 +376,7 @@ class catalogue(object):
             print "Number of multi-component islands is {0}.".format(self.blends)
             if self.med_si != -99:
                 print "Median spectral index is {0:.2f}.".format(self.med_si)
+
 
         #Store the initial length of the catalogue
         self.initial_count = self.count[self.name]

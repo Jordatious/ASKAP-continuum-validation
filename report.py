@@ -111,8 +111,8 @@ class report(object):
         else:
             self.css_style = """<?php include("base.inc"); ?>
             <meta name="DCTERMS.Creator" lang="en" content="personalName=Collier,Jordan" />
-            <meta name="DC.Title" lang="en" content="ASKAP Continuum Validation Report" />
-            <meta name="DC.Description" lang="en" content="ASKAP continuum validation report summarising science readiness of data via several metrics" />
+            <meta name="DC.Title" lang="en" content="Continuum Validation Report" />
+            <meta name="DC.Description" lang="en" content="Continuum validation report summarising science readiness of data via several metrics" />
             <?php standard_head(); ?>
             <style>
                 .reportTable {
@@ -146,8 +146,8 @@ class report(object):
                     background-color:#FF6347;
                 }
 
-            </style>
-            <title>ASKAP Continuum Validation Report</title>"""
+            </style>\n"""
+            self.css_style += "<title>{0} Continuum Validation Report</title>\n""".format(self.cat.name)
 
         #filename of html report
         self.name = 'index.html'
@@ -163,8 +163,10 @@ class report(object):
             rms_map = None
             solid_ang = self.cat.area*(np.pi/180)**2
 
+        self.write_html_cat_table()
+
         #plot the int/peak flux as a function of peak flux
-        self.int_peak_flux()
+        self.int_peak_flux(usePeak=True)
 
         #write source counts to report using rms map to measure solid angle or approximate solid angle
         if self.cat.name in self.cat.flux.keys():
@@ -206,11 +208,11 @@ class report(object):
         </head>
         <?php title_bar("atnf"); ?>
         <body>
-            <h1 align="middle">ASKAP Continuum Data Validation Report</h1>""".format(self.css_style))
+            <h1 align="middle">{1} Continuum Data Validation Report</h1>""".format(self.css_style,self.cat.name))
 
     def write_html_img_table(self,img):
 
-        """Write an observations, image and catalogue report tables derived from fits image, header and catalogue.
+        """Write an observations and image and catalogue report tables derived from fits image and header.
 
         Arguments:
         ----------
@@ -221,13 +223,6 @@ class report(object):
         project = img.project
         if project.startswith('AS'):
             project = self.add_html_link("https://confluence.csiro.au/display/askapsst/{0}+Data".format(img.project),img.project,file=False)
-        flux_type = 'integrated'
-        if self.cat.use_peak:
-            flux_type = 'peak'
-        if self.cat.med_si == -99:
-            med_si = ''
-        else:
-            med_si = '{0:.2f}'.format(self.cat.med_si)
 
         #Write observations report table
         self.html.write("""
@@ -288,6 +283,18 @@ class report(object):
                             self.cat.img_peak,
                             self.cat.dynamic_range,
                             self.cat.area))
+
+    def write_html_cat_table(self):
+
+        """Write an observations and image and catalogue report tables derived from fits image, header and catalogue."""
+
+        flux_type = 'integrated'
+        if self.cat.use_peak:
+            flux_type = 'peak'
+        if self.cat.med_si == -99:
+            med_si = ''
+        else:
+            med_si = '{0:.2f}'.format(self.cat.med_si)
 
         #Write catalogue report table
         self.html.write("""
@@ -417,7 +424,8 @@ class report(object):
                 #assign level to metric
                 self.metric_level[metric] = self.get_metric_level(good_condition,uncertain_condition)
 
-        self.write_CASDA_xml()
+        if self.img is not None:
+            self.write_CASDA_xml()
 
     def write_pipeline_offset_params(self):
 
@@ -509,13 +517,16 @@ class report(object):
             self.html.write('<td {0}>{1:.2f}</td>'.format(self.html_colour(self.metric_level['Spectral Index']),
                                                         self.metric_val['Spectral Index']))
 
+        by = ''
+        if self.cat.name != 'ASKAP':
+            by =  """ by <a href="mailto:Jordan.Collier@csiro.au">Jordan Collier</a>"""
         #Close table, write time generated, and close html file
         self.html.write("""</tr>
             </table>
-                <p><i>Generated at {0}</i></p>
+                <p><i>Generated at {0}{1}</i></p>
             <?php footer(); ?>
             </body>
-        </html>""".format(datetime.now()))
+        </html>""".format(datetime.now().strftime("%Y-%m-%d %H:%M:%S"),by))
         self.html.close()
         print "Continuum validation report written to '{0}'.".format(self.name)
 
@@ -607,31 +618,41 @@ class report(object):
             colour = "id='bad'"
         return colour
 
-    def int_peak_flux(self):
+    def int_peak_flux(self,usePeak=False):
 
         """Plot the int/peak fluxes as a function of peak flux.
 
-        Arguments:
-        ----------
-        int_fluxes : list-like
-            A list of the integrated fluxes in Jy.
-        peak_fluxes : list-like
-            A list of the peak fluxes in Jy."""
+        Keyword Arguments:
+        ------------------
+        usePeak : bool
+            Use peak flux as x axis, instead of SNR."""
 
-
-        self.cat.df['ASKAP_int_peak_ratio'] = self.cat.df[self.cat.flux_col] / self.cat.df[self.cat.peak_col]
+        ratioCol = '{0}_int_peak_ratio'.format(self.cat.name)
+        self.cat.df[ratioCol] = self.cat.df[self.cat.flux_col] / self.cat.df[self.cat.peak_col]
         SNR = self.cat.df[self.cat.peak_col]/self.cat.df[self.cat.rms_val]
-        ratio = self.cat.df['ASKAP_int_peak_ratio']
+        ratio = self.cat.df[ratioCol]
+        peak = self.cat.df[self.cat.peak_col]
+
+        xaxis = SNR
+        if usePeak:
+            xaxis = peak
 
         #plot the int/peak flux ratio
         fig = plt.figure(**self.fig_size)
         title = "{0} int/peak flux ratio".format(self.cat.name)
 
         if self.plot_to == 'html':
-            xlabel = 'S/N'
+            if usePeak:
+                xlabel = 'Peak flux ({0})'.format(self.cat.flux_unit.replace('j','J'))
+            else:
+                xlabel = 'S/N'
             ylabel = 'Int / Peak Flux Ratio'
         else:
-            xlabel = r'${\rm S_{peak} / \sigma_{rms}}$'
+            xlabel = r'${\rm S_{peak}$'
+            if usePeak:
+                xlabel += ' ({0})'.format(self.cat.flux_unit.replace('j','J'))
+            else:
+                xlabel += r'$ / \sigma_{rms}}$'
             ylabel = r'${\rm S_{int} / S_{peak}}$'
 
         if self.plot_to != 'screen':
@@ -640,12 +661,12 @@ class report(object):
             filename = ''
 
         #get non-nan data shared between each used axis as a numpy array
-        x,y,c,indices = self.shared_indices(SNR,yaxis=ratio)#,caxis=self.cat.dec[self.cat.name])
+        x,y,c,indices = self.shared_indices(xaxis,yaxis=ratio)#,caxis=self.cat.dec[self.cat.name])
         plt.loglog()
         plt.gca().grid(b=True, which='minor', color='w', linewidth=0.5)
 
         #hack to overlay resolved sources in red
-        xres,yres= SNR[self.cat.resolved],ratio[self.cat.resolved]
+        xres,yres= xaxis[self.cat.resolved],ratio[self.cat.resolved]
         markers = self.markers.copy()
         markers['color'] = 'r'
         markers.pop('s')

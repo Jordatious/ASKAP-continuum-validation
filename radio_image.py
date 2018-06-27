@@ -277,3 +277,34 @@ class radio_image(object):
                 os.system(command)
             else:
                 print "'{0}' already exists. Skipping AeRes.".format(self.residual)
+
+    def correct_img(self,dRA,dDEC,flux_factor=1.0):
+
+        """Correct the header of the fits image from this instance, by shifting the reference positions,
+        and optionally multiplying the pixels by a factor. Write the image to 'name_corrected.fits'.
+
+        Arguments:
+        ----------
+        dRA : float
+            The RA offset in SECONDS. NOTE: This is not in arcsec.
+        dDEC : float
+            The DEC offset in arcsec.
+
+        Keyword Arguments:
+        ------------------
+        flux_factor : float
+            The factor by which to mutiply all pixels."""
+
+        filename = '{0}_corrected.fits'.format(self.basename)
+        print "Correcting header of fits image and writing to '{0}'".format(filename)
+        print "Shifting RA by {0} seconds and DEC by {1} arcsec".format(dRA,dDEC)
+
+        if flux_factor != 1.0:
+            print "Multiplying image by {0}".format(flux_factor)
+
+        #Shift the central RA/DEC in degrees, and multiply the image by the flux factor (x1 by default)
+        #WCS axes start at 0 but fits header axes start at 1
+        self.fits.header['CRVAL' + str(self.ra_axis+1)] += dRA/3600
+        self.fits.header['CRVAL' + str(self.dec_axis+1)] += dDEC/3600
+        self.fits.data[0][0] *= flux_factor
+        self.fits.writeto(filename,clobber=True)
