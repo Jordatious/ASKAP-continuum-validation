@@ -1,4 +1,4 @@
-from __future__ import division
+
 import os
 import numpy as np
 import scipy.optimize as opt
@@ -22,8 +22,8 @@ def changeDir(filepath,suffix,verbose=False):
     ------------------
     verbose : bool
         Verbose output."""
-
-    #derive directrory name for output files
+ 
+    # derive directrory name for output files
     filename = filepath.split('/')[-1]
     basename = remove_extn(filename)
     dir = '{0}_continuum_validation_{1}'.format(basename,suffix)
@@ -31,15 +31,15 @@ def changeDir(filepath,suffix,verbose=False):
     #create it if it doesn't exist
     if not os.path.exists(dir):
         if verbose:
-            print "Making directory for output files - {0}.".format(dir)
+            print("Making directory for output files - {0}.".format(dir))
         os.mkdir(dir)
 
-    #move to that directory and update the filepath
+    # move to that directory and update the filepath
     if verbose:
-        print "Changing to directory for output files - '{0}'.".format(dir)
+        print("Changing to directory for output files - '{0}'.".format(dir))
     os.chdir(dir)
 
-###The following are radio SED models as a function of frequency and several fitted parmaters###
+# The following are radio SED models as a function of frequency and several fitted parmaters
 
 def powlaw(freq,S_norm,alpha):
     return S_norm*freq**alpha
@@ -138,11 +138,11 @@ def ticks_format(value, index):
     tick : string
         The tick at that value, in LaTeX format."""
 
-    #get the exponent and base
+    # get the exponent and base
     exp = np.floor(np.log10(value))
     base = value/10**exp
 
-    #format according to values
+    # format according to values
     if exp >= 0 and exp <= 3:
         return '${0:d}$'.format(int(value))
     elif exp <= -1:
@@ -217,21 +217,21 @@ def plot_spectra(freqs, fluxes, errs, models, names, params, param_errs, rcs, BI
 
             'better' - plot each model better than the previous, chronologically."""
 
-    #create SEDs directory if doesn't already exist
+    # create SEDs directory if doesn't already exist
     if not os.path.exists('SEDs'):
         os.mkdir('SEDs')
 
     fig=plt.figure()
     ax=plt.subplot()
 
-    #plot frequency axis 20% beyond range of values
+    # plot frequency axis 20% beyond range of values
     xlin = np.linspace(min(freqs)*0.8,max(freqs)*1.2,num=5000)
     plt.ylabel(r'Flux Density $S$ (mJy)')
     plt.xlabel(r'Frequency $\nu$ (GHz)')
     plt.xscale('log')
     plt.yscale('log')
 
-    #adjust the tick values and add grid lines at minor tick locations
+    # adjust the tick values and add grid lines at minor tick locations
     subs = [1.0, 2.0, 5.0]
     ax.xaxis.set_major_locator(ticker.LogLocator(subs=subs))
     ax.yaxis.set_major_locator(ticker.LogLocator(subs=subs))
@@ -241,7 +241,7 @@ def plot_spectra(freqs, fluxes, errs, models, names, params, param_errs, rcs, BI
     ax.yaxis.set_major_formatter(ticker.FuncFormatter(ticks_format_flux))
     ax.grid(b=True, which='minor', color='w', linewidth=0.5)
 
-    #plot flux measurements
+    # plot flux measurements
     plt.errorbar(freqs,fluxes,yerr=errs,linestyle='none',marker='.',c='r',zorder=15)
 
     best_bic = 0
@@ -249,12 +249,12 @@ def plot_spectra(freqs, fluxes, errs, models, names, params, param_errs, rcs, BI
     offset = 0
     plotted_models = 0
 
-    #plot each model
+    # plot each model
     for i in range (len(models)):
         ylin = models[i](xlin,*params[i])
         txt = "{0}:\n   {1}".format(labels[i],r'$\chi^2_{\rm red} = %.1f$' % rcs[i])
 
-        #compare BIC values
+        # compare BIC values
         bic = BICs[i]
         if i > 0:
             dBIC = best_bic - bic
@@ -263,7 +263,7 @@ def plot_spectra(freqs, fluxes, errs, models, names, params, param_errs, rcs, BI
         if dBIC >= 3:
             best_bic = bic
 
-        #plot model if selected according to input
+        # plot model if selected according to input
         if model_selection == 'all' or (model_selection == 'better' and dBIC >= 3) or (model_selection == 'best' and BICs[i] == min(BICs)):
 
             plotted_models += 1
@@ -271,7 +271,7 @@ def plot_spectra(freqs, fluxes, errs, models, names, params, param_errs, rcs, BI
             plt.legend(scatterpoints=1,fancybox=True,frameon=True,shadow=True)
             txt += '\n'
 
-            #add each fitted parameter to string (in LaTeX format)
+            # add each fitted parameter to string (in LaTeX format)
             for j,param in enumerate(names[i]):
                 units = ''
                 tokens = param.split('_')
@@ -302,12 +302,12 @@ def plot_spectra(freqs, fluxes, errs, models, names, params, param_errs, rcs, BI
 
                 txt += '   ' + r'${0}$ = {1} $\pm$ {2} {3}'.format(param,val,err,units) + '\n'
 
-            #annotate all fit info if it will fit on figure
+            # annotate all fit info if it will fit on figure
             if annotate and plotted_models <= 3:
                 plt.text(offset,0,txt,horizontalalignment='left',verticalalignment='bottom',transform=ax.transAxes)
                 offset += 0.33
 
-    #write figure and close
+    # write figure and close
     plt.savefig('SEDs/{0}'.format(figname))
     plt.close()
 
@@ -331,7 +331,7 @@ def likelihood(ydata,ymodel,yerrs):
 
     return np.prod( ( 1 / (yerrs*np.sqrt(2*np.pi)) ) * np.exp( (-1/(2*yerrs**2)) * (ydata-ymodel)**2 ) )
 
-def fit_info(ydata,ymodel,yerrs,deg):
+def fit_info(ydata, ymodel, yerrs, deg):
 
     """Return the reduced chi squared and BIC values for a given model of a single source.
 
@@ -354,10 +354,10 @@ def fit_info(ydata,ymodel,yerrs,deg):
         The Bayesian Information Criteria."""
 
     chi_sq=np.sum(((ydata-ymodel)/yerrs)**2)
-    DOF=len(ydata)-deg
+    DOF=len(ydata) - deg
     red_chi_sq = chi_sq/DOF
     BIC = -2*np.log(likelihood(ydata,ymodel,yerrs)) + deg * np.log(len(ydata))
-    return red_chi_sq,BIC
+    return red_chi_sq, BIC
 
 def two_freq_power_law(freq, freqs, fluxes, errs):
 
@@ -383,7 +383,7 @@ def two_freq_power_law(freq, freqs, fluxes, errs):
     flux : float
         The fitted flux at the input frequency."""
 
-    #directly derive alpha and error from two fluxes
+    # directly derive alpha and error from two fluxes
     alpha = np.log10(fluxes[0]/fluxes[1]) / np.log10(freqs[0]/freqs[1])
     alpha_err = np.sqrt((errs[0]/fluxes[0])**2 + (errs[1]/fluxes[1])**2)/np.log10(freqs[0]/freqs[1])
     flux = flux_at_freq(freq,freqs[0],fluxes[0],alpha)
@@ -429,7 +429,7 @@ def SED(freq, freqs, fluxes, errs, models='pow', figname=None):
     BICs : list
         A list of Bayesian Information Criteria (BIC) values, for each input model."""
 
-    #initial guesses of different params
+    # initial guesses of different params
     S_max = max(fluxes)
     nu_max = freqs[fluxes == S_max][0]
     alpha = -0.8
@@ -437,7 +437,7 @@ def SED(freq, freqs, fluxes, errs, models='pow', figname=None):
     nu_br = np.mean(freqs)
     p = 0.5
 
-    #initial guesses of different models
+    # initial guesses of different models
     params = { 'pow' : [S_max,alpha],
             'powcibreak' : [S_max, alpha, nu_br],
             'powjpbreak' : [S_max, alpha, nu_br],
@@ -450,7 +450,7 @@ def SED(freq, freqs, fluxes, errs, models='pow', figname=None):
             'bicffacibreak' : [S_max, alpha, p, nu_max, nu_br],
             'bicffajpbreak' : [S_max, alpha, p, nu_max, nu_br]}
 
-    #different SED models from functions above
+    # different SED models from functions above
     funcs = {   'pow' : powlaw,
                 'powcibreak' : pow_CIbreak,
                 'powjpbreak' : pow_JPbreak,
@@ -463,7 +463,7 @@ def SED(freq, freqs, fluxes, errs, models='pow', figname=None):
                 'bicffacibreak' : Bic98_FFA_CIbreak,
                 'bicffajpbreak' : Bic98_FFA_JPbreak}
 
-    #matplotlib colours
+    # matplotlib colours
     colours = { 'pow' : 'black',
             'powcibreak' : 'b',
             'powjpbreak' : 'violet',
@@ -476,7 +476,7 @@ def SED(freq, freqs, fluxes, errs, models='pow', figname=None):
             'bicffacibreak' : 'b',
             'bicffajpbreak' : 'r'}
 
-    #labels
+    # labels
     labels = {  'pow' : 'Power law',
                 'powcibreak' : 'Power law\n + CI break',
                 'powjpbreak' : 'Power law\n + JP break',
@@ -489,23 +489,23 @@ def SED(freq, freqs, fluxes, errs, models='pow', figname=None):
                 'bicffacibreak' : 'Bicknell+98 FFA\n + CI break',
                 'bicffajpbreak' : 'Bicknell+98 FFA\n + JP break'}
 
-    #store used models, fitted parameters and errors, fitted fluxes, reduced chi squared and BIC
+    # store used models, fitted parameters and errors, fitted fluxes, reduced chi squared and BIC
     fit_models,fit_params,fit_param_errors,fitted_fluxes,rcs,BICs = [],[],[],[],[],np.array([])
 
-    #convert single model to list
+    # convert single model to list
     if type(models) is str:
         models = [models]
 
     for model in models:
         model = model.lower()
 
-        #fit model if DOF >= 1
+        # fit model if DOF >= 1
         if len(freqs) >= len(params[model])+1:
             try:
-                #perform a least squares fit
+                # perform a least squares fit
                 popt, pcov = opt.curve_fit(funcs[model], freqs, fluxes, p0 = params[model], sigma = errs, maxfev = 10000)
 
-                #add all fit info to lists
+                # add all fit info to lists
                 fit_models.append(model)
                 fit_params.append(popt)
                 fit_param_errors.append(np.sqrt(np.diag(pcov)))
@@ -513,24 +513,24 @@ def SED(freq, freqs, fluxes, errs, models='pow', figname=None):
                 rcs.append(RCS)
                 BICs = np.append(BICs,bic)
                 fitted_fluxes.append(funcs[model](freq,*popt))
-            except (ValueError,RuntimeError),e:
-                print "Couldn't find good fit for {0} model.".format(model)
-                print e
+            except (ValueError,RuntimeError) as e:
+                print("Couldn't find good fit for {0} model.".format(model))
+                print(e)
 
-    #get lists of names, functions, colours and labels for all used models
-    names = [funcs[model].func_code.co_varnames[1:funcs[model].func_code.co_argcount] for model in fit_models]
+    # get lists of names, functions, colours and labels for all used models
+    names = [funcs[model].__code__.co_varnames[1:funcs[model].__code__.co_argcount] for model in fit_models]
     funcs = [funcs[model] for model in fit_models]
     colours = [colours[model] for model in fit_models]
     labels = [labels[model] for model in fit_models]
 
-    #write figure for this source
+    # write figure for this source
     if figname is not None and len(fit_models) > 0:
-        plot_spectra(freqs,fluxes,errs,funcs,names,fit_params,fit_param_errors,rcs,BICs,colours,labels,figname,model_selection='all')
+        plot_spectra(freqs, fluxes, errs, funcs, names, fit_params, fit_param_errors, rcs, BICs, colours, labels, figname, model_selection='all')
 
-    return fit_models,names,fit_params,fit_param_errors,fitted_fluxes,rcs,BICs
+    return fit_models, names, fit_params, fit_param_errors, fitted_fluxes, rcs, BICs
 
 
-def get_pixel_area(fits,flux=0,nans=False,ra_axis=0,dec_axis=1,w=None):
+def get_pixel_area(fits, flux=0, nans=False, ra_axis=0, dec_axis=1, w=None):
 
     """For a given image, get the area and solid angle of all non-nan pixels or all pixels below a certain flux (doesn't count pixels=0).
     The RA and DEC axes follow the WCS convention (i.e. starting from 0).
@@ -568,7 +568,7 @@ def get_pixel_area(fits,flux=0,nans=False,ra_axis=0,dec_axis=1,w=None):
     if w is None:
         w = WCS(fits.header)
 
-    #count the pixels and derive area and solid angle of all these pixels
+    # count the pixels and derive area and solid angle of all these pixels
     if nans:
         count = fits.data[(~np.isnan(fits.data)) & (fits.data != 0)].shape[0]
     else:
@@ -579,7 +579,7 @@ def get_pixel_area(fits,flux=0,nans=False,ra_axis=0,dec_axis=1,w=None):
     return area,solid_ang
 
 
-def axis_lim(data,func,perc=10):
+def axis_lim(data, func, perc=10):
 
     """Return an axis limit value a certain % beyond the min/max value of a dataset.
 
@@ -642,7 +642,7 @@ def get_stats(data):
     numpy.array
     pandas.Series"""
 
-    #remove nan indices, as these affect the calculations
+    # remove nan indices, as these affect the calculations
     values = data[~np.isnan(data)]
 
     med = np.median(values)
@@ -651,7 +651,7 @@ def get_stats(data):
     sterr = std / np.sqrt(len(values))
     rms_mad = np.median(np.abs(values-np.median(values)))/0.6745
 
-    return med,mean,std,sterr,rms_mad
+    return med, mean, std, sterr, rms_mad
 
 
 def remove_extn(filename):
@@ -668,10 +668,10 @@ def remove_extn(filename):
     filename : string
         The file name without its extension."""
 
-    #do this in case more than one '.' in file name
+    # do this in case more than one '.' in file name
     return '.'.join(filename.split('.')[:-1])
 
-def config2dic(filepath,main_dir,verbose=False):
+def config2dic(filepath, main_dir, verbose=False):
 
     """Read a configuration file and create an dictionary of arguments from its contents, which will usually be passed into a new object instance.
 
@@ -692,21 +692,21 @@ def config2dic(filepath,main_dir,verbose=False):
     args_dict : dict
         A dictionary of arguments, to be passed into some function, usually a new object instance."""
 
-    #open file and read contents
+    # open file and read contents
     config_file = open(filepath)
     txt = config_file.read()
     args_dict = {}
 
-    #set up dictionary of arguments based on their types
+    # set up dictionary of arguments based on their types
     for line in txt.split('\n'):
         if len(line) > 0 and line.replace(' ','')[0] != '#':
-            #use '=' as delimiter and strip whitespace
+            # use '=' as delimiter and strip whitespace
             split = line.split('=')
             key = split[0].strip()
             val = split[1].strip()
             val = parse_string(val)
 
-            #if parameter is filename, store the filepath
+            # if parameter is filename, store the filepath
             if key == 'filename':
                 val = find_file(val,main_dir,verbose=verbose)
 
@@ -753,7 +753,7 @@ def new_path(filepath):
     filepath : string
         The updated filepath."""
 
-    #add '../' to filepath if it's a relative filepath
+    # add '../' to filepath if it's a relative filepath
     if filepath is not None and filepath[0] != '/':
         filepath = '../' + filepath
 
@@ -775,17 +775,17 @@ def find_file(filepath,main_dir,verbose=True):
     filepath : string
         The path to where the file was found."""
 
-    #raise exception if file still not found
+    # raise exception if file still not found
     if not (os.path.exists(filepath) or os.path.exists('{0}/{1}'.format(main_dir,filepath)) or os.path.exists(new_path(filepath))):
         raise Exception("Can't find file - {0}. Ensure this file is in input path or --main-dir.\n".format(filepath))
-    #otherwise update path to where file exists
+    # otherwise update path to where file exists
     elif not os.path.exists(filepath):
-        #look in main directory if file doesn't exist in relative filepath
+        # look in main directory if file doesn't exist in relative filepath
         if os.path.exists('{0}/{1}'.format(main_dir,filepath)):
             if verbose:
-                print "Looking in '{0}' for '{1}'.".format(main_dir,filepath)
+                print("Looking in '{0}' for '{1}'.".format(main_dir,filepath))
             filepath = '{0}/{1}'.format(main_dir,filepath)
-        #update directory path if file is relative path
+        # update directory path if file is relative path
         else:
             filepath = new_path(filepath)
 

@@ -42,20 +42,23 @@ Options:
   -c --correct=<level>      Correct the input fits image, write to 'name_corrected.fits' and use this to run through 2nd iteration of validation.
                             Fits image is corrected according to input level (0: none, 1: positions, 2: positions + fluxes) [default: 0]."""
 
-from __future__ import division
-from docopt import docopt
 import os
 import sys
 import glob
-from datetime import datetime
 import warnings
+from functions import *
+from radio_image import radio_image
+from catalogue import catalogue
+from report import report
+from docopt import docopt
+from datetime import datetime
 from inspect import currentframe, getframeinfo
 
-#Set my own obvious warning output
+# Set my own obvious warning output
 cf = currentframe()
 WARN = '\n\033[91mWARNING: \033[0m' + getframeinfo(cf).filename
 
-#Raise error if user tries to pass in noise map and then run Aegean
+# Raise error if user tries to pass in noise map and then run Aegean
 try:
     args = docopt(__doc__)
     if args['--main'] == 'None':
@@ -67,31 +70,26 @@ except SyntaxError:
     warnings.warn_explicit("""Use option -h to see usage.\n""",UserWarning,WARN,cf.f_lineno)
     sys.exit()
 
-#don't use normal display environment unless user wants to view plots on screen
+# don't use normal display environment unless user wants to view plots on screen
 import matplotlib as mpl
 if args['--source'] != 'screen':
     mpl.use('Agg')
 
-from functions import *
-from radio_image import radio_image
-from catalogue import catalogue
-from report import report
-
-#find directory that contains all the necessary files
+# find directory that contains all the necessary files
 main_dir = args['--main-dir']
-if main_dir.startswith('$ACES') and 'ACES' in os.environ.keys():
+if main_dir.startswith('$ACES') and 'ACES' in list(os.environ.keys()):
     ACES = os.environ['ACES']
     main_dir = main_dir.replace('$ACES',ACES)
 if not os.path.exists('{0}/requirements.txt'.format(main_dir)):
     split = sys.argv[0].split('/')
     script_dir = '/'.join(split[:-1])
-    print "Looking in '{0}' for necessary files.".format(script_dir)
+    print("Looking in '{0}' for necessary files.".format(script_dir))
     if 'Radio_continuum_validation' in split[-1]:
         main_dir = script_dir
     else:
         warnings.warn_explicit("Can't find necessary files in main directory - {0}.\n".format(main_dir),UserWarning,WARN,cf.f_lineno)
 
-#Set paramaters passed in by user
+# Set paramaters passed in by user
 img = parse_string(args['--fits'])
 verbose = args['--verbose']
 source = args['--source']
@@ -109,7 +107,7 @@ snr = float(args['--snr'])
 
 if '*' in args['--catalogues']:
     config_files = glob.glob(args['--catalogues'])
-    print config_files
+    print(config_files)
 else:
     config_files = args['--catalogues'].split(',')
 SEDs = args['--SEDs'].split(',')
@@ -120,36 +118,36 @@ if args['--SEDs'] == 'None':
 else:
     fit_flux=True
 
-#force write_all=False write_any=False
+# force write_all=False write_any=False
 if not write_any:
     write_all = False
 
-#add '../' to relative paths of these files, since
-#we'll create and move into a directory for output files
+# add '../' to relative paths of these files, since
+# we'll create and move into a directory for output files
 filter_config = new_path(parse_string(args['--filter']))
 main_cat_config = parse_string(args['--main'])
 noise = new_path(parse_string(args['--noise']))
 
 if __name__ == "__main__":
 
-    #add S/N and peak/int to output directory/file names
+    # add S/N and peak/int to output directory/file names
     suffix = 'snr{0}_'.format(snr)
     if use_peak:
         suffix += 'peak'
     else:
         suffix += 'int'
 
-    #Load in fits image
+    # Load in fits image
     if img is not None:
         changeDir(img,suffix,verbose=verbose)
         img = new_path(img)
         image = radio_image(img,verbose=verbose,rms_map=noise)
 
-        #Run BANE if user hasn't input noise map
+        # Run BANE if user hasn't input noise map
         if noise is None:
             image.run_BANE(ncores=ncores,redo=refind)
 
-        #Run Aegean and create main catalogue object from its output
+        # Run Aegean and create main catalogue object from its output
         if main_cat_config is None:
             image.run_Aegean(ncores=ncores,redo=refind,params=aegean_params,write=write_any)
             cat = catalogue(image.cat_comp,scope,finder='aegean',image=image,verbose=verbose,autoload=False,use_peak=use_peak)
@@ -160,56 +158,56 @@ if __name__ == "__main__":
     if main_cat_config is not None:
         main_cat_config = new_path(main_cat_config)
 
-        #Use input catalogue config file
+        # Use input catalogue config file
         if verbose:
-            print "Using config file '{0}' for main catalogue.".format(main_cat_config)
+            print("Using config file '{0}' for main catalogue.".format(main_cat_config))
         main_cat_config = find_file(main_cat_config,main_dir,verbose=verbose)
         main_cat_config_dic = config2dic(main_cat_config,main_dir,verbose=verbose)
         main_cat_config_dic.update({'image' : image, 'verbose' : verbose, 'autoload' : False})
         cat = catalogue(**main_cat_config_dic)
 
-    #Filter out sources below input SNR, and set key fields and create report object before
-    #filtering catalogue further so source counts can be written for all sources above input SNR
+    # Filter out sources below input SNR, and set key fields and create report object before
+    # filtering catalogue further so source counts can be written for all sources above input SNR
     cat.filter_sources(SNR=snr,redo=redo,write=write_any,verbose=verbose,file_suffix='_snr{0}'.format(snr))
     cat.set_specs(image)
     myReport = report(cat,main_dir,img=image,verbose=verbose,plot_to=source,redo=redo,src_cnt_bins=nbins,write=write_any)
 
-    #use config file for filtering sources if it exists
+    # use config file for filtering sources if it exists
     if filter_config is not None:
         if verbose:
-            print "Using config file '{0}' for filtering.".format(filter_config)
+            print("Using config file '{0}' for filtering.".format(filter_config))
         filter_dic = config2dic(filter_config,main_dir,verbose=verbose)
         filter_dic.update({'redo' : redo, 'write' : write_all, 'verbose' : verbose})
         cat.filter_sources(**filter_dic)
     else:
-        #Only use reliable point sources for comparison
-        cat.filter_sources(flux_lim=1e-3,ratio_frac=1.4,reject_blends=True,flags=True,psf_tol=1.5,resid_tol=3,redo=redo,write=write_all,verbose=verbose)
+        # Only use reliable point sources for comparison
+        cat.filter_sources(flux_lim=1e-3, ratio_frac=1.4, reject_blends=True, flags=True, psf_tol=1.5, resid_tol=3, redo=redo, write=write_all, verbose=verbose)
 
-    #process each catalogue object according to list of input catalogue config files
-    #this will cut out a box, cross-match to this instance, and derive the spectral index.
+    # process each catalogue object according to list of input catalogue config files
+    # this will cut out a box, cross-match to this instance, and derive the spectral index.
     for config_file in config_files:
         if verbose:
-            print "Using config file '{0}' for catalogue.".format(config_file)
-        config_file = config_file.strip() #in case user put a space
-        config_file = find_file(config_file,main_dir,verbose=verbose)
-        cat.process_config_file(config_file,main_dir,redo=redo,verbose=verbose,write_all=write_all,write_any=write_any)
+            print("Using config file '{0}' for catalogue.".format(config_file))
+        config_file = config_file.strip() # in case user put a space
+        config_file = find_file(config_file, main_dir, verbose=verbose)
+        cat.process_config_file(config_file, main_dir, redo=redo, verbose=verbose, write_all=write_all, write_any=write_any)
 
-    #Derive spectral indices using all fluxes except from main catalogue, and derive the flux at this frequency
+    # Derive spectral indices using all fluxes except from main catalogue, and derive the flux at this frequency
     if len(cat.cat_list) > 1:
-        cat.fit_spectra(redo=redo,models=SEDs,GLEAM_subbands='int',GLEAM_nchans=None,cat_name=None,write=write_any,fit_flux=fit_flux,fig_extn=SEDextn)
+        cat.fit_spectra(redo=redo, models=SEDs, GLEAM_subbands='int', GLEAM_nchans=None, cat_name=None, write=write_any, fit_flux=fit_flux, fig_extn=SEDextn)
 
-    #Produce validation report for each cross-matched survey
+    # Produce validation report for each cross-matched survey
     for cat_name in cat.cat_list[1:]:
-        #print "Would validate {0}".format(cat_name)
+        # print "Would validate {0}".format(cat_name)
         if cat.count[cat_name] > 1:
             myReport.validate(cat.name,cat_name,redo=redo)
 
-    #write validation summary table and close html file
+    # write validation summary table and close html file
     myReport.write_html_end()
 
-    #correct image
+    # correct image
     flux_factor = 1.0
     if level == 2:
         flux_factor = myReport.metric_val['ratio']
     if level in (1,2):
-        image.correct_img(myReport.metric_val['dRA'],myReport.metric_val['dDEC'],flux_factor=flux_factor)
+        image.correct_img(myReport.metric_val['dRA'], myReport.metric_val['dDEC'], flux_factor=flux_factor)
