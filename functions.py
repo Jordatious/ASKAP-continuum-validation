@@ -1,4 +1,3 @@
-
 import os
 import numpy as np
 import scipy.optimize as opt
@@ -7,9 +6,10 @@ from astropy.wcs import WCS
 import matplotlib.pyplot as plt
 from matplotlib import ticker
 
-def changeDir(filepath,suffix,verbose=False):
 
-    """Derive a directory name from an input file to store all output files, create it, and then change to it.
+def changeDir(filepath, suffix, verbose=False):
+    """Derive a directory name from an input file to store all output files, create it,
+       and then change to it.
 
     Arguments:
     ----------
@@ -22,18 +22,15 @@ def changeDir(filepath,suffix,verbose=False):
     ------------------
     verbose : bool
         Verbose output."""
- 
     # derive directrory name for output files
     filename = filepath.split('/')[-1]
     basename = remove_extn(filename)
-    dir = '{0}_continuum_validation_{1}'.format(basename,suffix)
-
-    #create it if it doesn't exist
+    dir = '{0}_continuum_validation_{1}'.format(basename, suffix)
+    # create it if it doesn't exist
     if not os.path.exists(dir):
         if verbose:
             print("Making directory for output files - {0}.".format(dir))
         os.mkdir(dir)
-
     # move to that directory and update the filepath
     if verbose:
         print("Changing to directory for output files - '{0}'.".format(dir))
@@ -41,54 +38,75 @@ def changeDir(filepath,suffix,verbose=False):
 
 # The following are radio SED models as a function of frequency and several fitted parmaters
 
-def powlaw(freq,S_norm,alpha):
+
+def powlaw(freq, S_norm, alpha):
     return S_norm*freq**alpha
 
+
 def curve(freq, S_max, nu_m, alpha_thick, alpha_thin):
-	return S_max/(1 -np.exp(-1))*((freq/nu_m)**alpha_thick)*(1 - np.exp(-(freq/nu_m)**(alpha_thin-alpha_thick)))
+    num1 = (1 - np.exp(-1))*((freq / nu_m)**alpha_thick)
+    num2 = (1 - np.exp(-(freq/nu_m)**(alpha_thin-alpha_thick)))
+    return S_max / (num1*num2)
+
 
 def pow_CIbreak(freq, S_norm, alpha, nu_br):
     return S_norm*(freq/nu_br)**(alpha+0.5 + 0.5*(1 + (freq/nu_br)**4)**-1)
 
+
 def pow_CIbreak2(freq, S_norm, alpha, nu_br):
-	alpha,freq = CIbreak(freq,alpha,nu_br)
-	return S_norm*freq**alpha
+    alpha, freq = CIbreak(freq, alpha, nu_br)
+    return S_norm*freq**alpha
+
 
 def pow_JPbreak(freq, S_norm, alpha, nu_br):
-    return S_norm*(freq**alpha)*JPbreak(freq,nu_br)
+    return S_norm*(freq**alpha)*JPbreak(freq, nu_br)
 
-def SSA(freq,S_norm,beta,nu_m):
-	return S_norm*((freq/nu_m)**(-(beta-1)/2))*(1-np.exp(-(freq/nu_m)**(-(beta+4)/2)))/((freq/nu_m)**(-(beta+4)/2))
 
-def SSA_JPbreak(freq,S_norm,beta,nu_m,nu_br):
-	return SSA(freq,S_norm,beta,nu_m)*JPbreak(freq,nu_br)
+def SSA(freq, S_norm, beta, nu_m):
+    factor1 = ((freq/nu_m)**(-(beta-1)/2))
+    factor2 = (1-np.exp(-(freq/nu_m)**(-(beta+4)/2)))/((freq/nu_m)**(-(beta+4)/2))
+    return S_norm*factor1*factor2
 
-def SSA_CIbreak(freq,S_norm,beta,nu_m,nu_br):
-    dummyalpha,dummyfreq = CIbreak(freq,beta,nu_br)
-    return SSA(freq,S_norm,beta,nu_m)*dummyfreq**dummyalpha
 
-def FFA(freq,S_norm,alpha,nu_m):
+def SSA_JPbreak(freq, S_norm, beta, nu_m, nu_br):
+    return SSA(freq, S_norm, beta, nu_m)*JPbreak(freq, nu_br)
+
+
+def SSA_CIbreak(freq, S_norm, beta, nu_m, nu_br):
+    dummyalpha, dummyfreq = CIbreak(freq, beta, nu_br)
+    return SSA(freq, S_norm, beta, nu_m)*dummyfreq**dummyalpha
+
+
+def FFA(freq, S_norm, alpha, nu_m):
     return S_norm*(freq**(alpha))*np.exp(-(freq/nu_m)**(-2.1))
 
-def Bic98_FFA(freq,S_norm,alpha,p,nu_m):
-	return S_norm*(p+1)*((freq/nu_m)**(2.1*(p+1)+alpha))*special.gammainc((p+1),((freq/nu_m)**(-2.1)))*special.gamma(p+1)
 
-def Bic98_FFA_CIbreak(freq,S_norm,alpha,p,nu_m,nu_br):
-    dummyalpha,dummyfreq = CIbreak(freq,alpha,nu_br)
-    return Bic98_FFA(freq,S_norm,alpha,p,nu_m)*dummyfreq**dummyalpha
+def Bic98_FFA(freq, S_norm, alpha, p, nu_m):
+    factor1 = ((freq/nu_m)**(2.1*(p+1)+alpha))
+    factor2 = special.gammainc((p+1), ((freq/nu_m)**(-2.1)))*special.gamma(p+1)
+    return S_norm*(p+1)*factor1*factor2
 
-def Bic98_FFA_JPbreak(freq,S_norm,alpha,p,nu_m,nu_br):
-    return Bic98_FFA(freq,S_norm,alpha,p,nu_m)*JPbreak(freq,nu_br)
 
-def CIbreak(freq,alpha,nu_br):
+def Bic98_FFA_CIbreak(freq, S_norm, alpha, p, nu_m, nu_br):
+    dummyalpha, dummyfreq = CIbreak(freq, alpha, nu_br)
+    return Bic98_FFA(freq, S_norm, alpha, p, nu_m)*dummyfreq**dummyalpha
+
+
+def Bic98_FFA_JPbreak(freq, S_norm, alpha, p, nu_m, nu_br):
+    return Bic98_FFA(freq, S_norm, alpha, p, nu_m)*JPbreak(freq, nu_br)
+
+
+def CIbreak(freq, alpha, nu_br):
     alpha = np.where(freq <= nu_br, alpha, alpha-0.5)
     dummyfreq = freq / nu_br
-    return alpha,dummyfreq
+    return alpha, dummyfreq
 
-def JPbreak(freq,nu_br):
-    return np.exp(-freq/nu_br)
 
-def flux_at_freq(freq,known_freq,known_flux,alpha):
+def JPbreak(freq, nu_br):
+    return np.exp(-freq / nu_br)
+
+
+def flux_at_freq(freq, known_freq, known_flux, alpha):
 
     """Get the flux of a source at a given frequency, according to a given power law.
 
@@ -110,11 +128,13 @@ def flux_at_freq(freq,known_freq,known_flux,alpha):
 
     return 10**(alpha*(np.log10(freq) - np.log10(known_freq)) + np.log10(known_flux))
 
+
 def ticks_format_flux(value, index):
 
     """Return flux density ticks in mJy"""
     value = value*1e3
     return ticks_format(value, index)
+
 
 def ticks_format_freq(value, index):
 
@@ -122,9 +142,10 @@ def ticks_format_freq(value, index):
     value = value/1e3
     return ticks_format(value, index)
 
-def ticks_format(value, index):
 
-    """Return matplotlib ticks in LaTeX format, getting the value as integer [0,99], a 1 digit float [0.1, 0.9], or otherwise n*10^m.
+def ticks_format(value, index):
+    """Return matplotlib ticks in LaTeX format, getting the value as integer [0,99],
+    a 1 digit float [0.1, 0.9], or otherwise n*10^m.
 
     Arguments:
     ----------
@@ -152,7 +173,6 @@ def ticks_format(value, index):
 
 
 def sig_figs(value, n=2):
-
     """Return a string of the input value with n significant figures.
 
     Arguments:
@@ -173,9 +193,11 @@ def sig_figs(value, n=2):
     return ("{0:.%d}" % (n)).format(value)
 
 
-def plot_spectra(freqs, fluxes, errs, models, names, params, param_errs, rcs, BICs, colours, labels, figname, annotate=True, model_selection='better'):
-
-    """Plot a figure of the radio spectra of an individual source, according to the input data and models.
+def plot_spectra(freqs, fluxes, errs, models, names, params, param_errs, rcs,
+                 BICs, colours, labels, figname, annotate=True,
+                 model_selection='better'):
+    """Plot a figure of the radio spectra of an individual source,
+       according to the input data and models.
 
     Arguments:
     ----------
@@ -221,11 +243,11 @@ def plot_spectra(freqs, fluxes, errs, models, names, params, param_errs, rcs, BI
     if not os.path.exists('SEDs'):
         os.mkdir('SEDs')
 
-    fig=plt.figure()
-    ax=plt.subplot()
+    # fig=plt.figure()
+    ax = plt.subplot()
 
     # plot frequency axis 20% beyond range of values
-    xlin = np.linspace(min(freqs)*0.8,max(freqs)*1.2,num=5000)
+    xlin = np.linspace(min(freqs)*0.8, max(freqs)*1.2, num=5000)
     plt.ylabel(r'Flux Density $S$ (mJy)')
     plt.xlabel(r'Frequency $\nu$ (GHz)')
     plt.xscale('log')
@@ -242,7 +264,7 @@ def plot_spectra(freqs, fluxes, errs, models, names, params, param_errs, rcs, BI
     ax.grid(b=True, which='minor', color='w', linewidth=0.5)
 
     # plot flux measurements
-    plt.errorbar(freqs,fluxes,yerr=errs,linestyle='none',marker='.',c='r',zorder=15)
+    plt.errorbar(freqs, fluxes, yerr=errs, linestyle='none', marker='.', c='r', zorder=15)
 
     best_bic = 0
     dBIC = 3
@@ -250,9 +272,9 @@ def plot_spectra(freqs, fluxes, errs, models, names, params, param_errs, rcs, BI
     plotted_models = 0
 
     # plot each model
-    for i in range (len(models)):
-        ylin = models[i](xlin,*params[i])
-        txt = "{0}:\n   {1}".format(labels[i],r'$\chi^2_{\rm red} = %.1f$' % rcs[i])
+    for i in range(len(models)):
+        ylin = models[i](xlin, *params[i])
+        txt = "{0}:\n   {1}".format(labels[i], r'$\chi^2_{\rm red} = %.1f$' % rcs[i])
 
         # compare BIC values
         bic = BICs[i]
@@ -264,21 +286,23 @@ def plot_spectra(freqs, fluxes, errs, models, names, params, param_errs, rcs, BI
             best_bic = bic
 
         # plot model if selected according to input
-        if model_selection == 'all' or (model_selection == 'better' and dBIC >= 3) or (model_selection == 'best' and BICs[i] == min(BICs)):
+        if model_selection == 'all' or (model_selection == 'better' and
+                                        dBIC >= 3) or (model_selection == 'best' and
+                                                       BICs[i] == min(BICs)):
 
             plotted_models += 1
-            plt.plot(xlin,ylin,c=colours[i],linestyle='--',zorder=i+1,label=labels[i])
-            plt.legend(scatterpoints=1,fancybox=True,frameon=True,shadow=True)
+            plt.plot(xlin, ylin, c=colours[i], linestyle='--', zorder=i+1, label=labels[i])
+            plt.legend(scatterpoints=1, fancybox=True, frameon=True, shadow=True)
             txt += '\n'
 
             # add each fitted parameter to string (in LaTeX format)
-            for j,param in enumerate(names[i]):
+            for j, param in enumerate(names[i]):
                 units = ''
                 tokens = param.split('_')
                 if len(tokens[0]) > 1:
                     tokens[0] = "\\" + tokens[0]
                 if len(tokens) > 1:
-                    param = r'%s_{\rm %s}' % (tokens[0],tokens[1])
+                    param = r'%s_{\rm %s}' % (tokens[0], tokens[1])
                 else:
                     param = tokens[0]
                 val = params[i][j]
@@ -300,19 +324,21 @@ def plot_spectra(freqs, fluxes, errs, models, names, params, param_errs, rcs, BI
                 val = sig_figs(val)
                 err = sig_figs(err)
 
-                txt += '   ' + r'${0}$ = {1} $\pm$ {2} {3}'.format(param,val,err,units) + '\n'
+                txt += '   ' + r'${0}$ = {1} $\pm$ {2} {3}'.format(param, val, err, units) + '\n'
 
             # annotate all fit info if it will fit on figure
             if annotate and plotted_models <= 3:
-                plt.text(offset,0,txt,horizontalalignment='left',verticalalignment='bottom',transform=ax.transAxes)
+                plt.text(offset, 0, txt, horizontalalignment='left', verticalalignment='bottom',
+                         transform=ax.transAxes)
                 offset += 0.33
 
     # write figure and close
     plt.savefig('SEDs/{0}'.format(figname))
     plt.close()
+    return
 
-def likelihood(ydata,ymodel,yerrs):
 
+def likelihood(ydata, ymodel, yerrs):
     """Return the likelihood for a given model of a single source.
 
     Arguments:
@@ -329,10 +355,10 @@ def likelihood(ydata,ymodel,yerrs):
     likelihood : float
         The likelihood."""
 
-    return np.prod( ( 1 / (yerrs*np.sqrt(2*np.pi)) ) * np.exp( (-1/(2*yerrs**2)) * (ydata-ymodel)**2 ) )
+    return np.prod((1 / (yerrs*np.sqrt(2*np.pi))) * np.exp((-1/(2*yerrs**2)) * (ydata-ymodel)**2))
+
 
 def fit_info(ydata, ymodel, yerrs, deg):
-
     """Return the reduced chi squared and BIC values for a given model of a single source.
 
     Arguments:
@@ -353,14 +379,14 @@ def fit_info(ydata, ymodel, yerrs, deg):
     BIC : float
         The Bayesian Information Criteria."""
 
-    chi_sq=np.sum(((ydata-ymodel)/yerrs)**2)
-    DOF=len(ydata) - deg
+    chi_sq = np.sum(((ydata-ymodel)/yerrs)**2)
+    DOF = len(ydata) - deg
     red_chi_sq = chi_sq/DOF
-    BIC = -2*np.log(likelihood(ydata,ymodel,yerrs)) + deg * np.log(len(ydata))
+    BIC = -2*np.log(likelihood(ydata, ymodel, yerrs)) + deg * np.log(len(ydata))
     return red_chi_sq, BIC
 
-def two_freq_power_law(freq, freqs, fluxes, errs):
 
+def two_freq_power_law(freq, freqs, fluxes, errs):
     """Derive a two-frequency spectral index, uncertainty and fitted flux at the input frequency.
 
     Arguments:
@@ -386,13 +412,15 @@ def two_freq_power_law(freq, freqs, fluxes, errs):
     # directly derive alpha and error from two fluxes
     alpha = np.log10(fluxes[0]/fluxes[1]) / np.log10(freqs[0]/freqs[1])
     alpha_err = np.sqrt((errs[0]/fluxes[0])**2 + (errs[1]/fluxes[1])**2)/np.log10(freqs[0]/freqs[1])
-    flux = flux_at_freq(freq,freqs[0],fluxes[0],alpha)
-    return alpha,alpha_err,flux
+    flux = flux_at_freq(freq, freqs[0], fluxes[0], alpha)
+    return alpha, alpha_err, flux
+
 
 def SED(freq, freqs, fluxes, errs, models='pow', figname=None):
-
-    """Fit SED models to an individual source and return the model params and errors along with the expected flux at a given frequency, for each input model.
-    Lists must be the same length and contain at least two elements, all with the same units (ideally MHz and Jy).
+    """Fit SED models to an individual source and return the model params and
+    errors along with the expected flux at a given frequency, for each input model.
+    Lists must be the same length and contain at least two elements, all with
+    the same units (ideally MHz and Jy).
 
     Arguments:
     ----------
@@ -410,7 +438,8 @@ def SED(freq, freqs, fluxes, errs, models='pow', figname=None):
     models : string or list
         A single model or list of models to fit (e.g. ['pow','FFA','SSA']).
     figname : string
-        Write a figure of the radio spectra and model to file, using this filename. Use None to not write to file.
+        Write a figure of the radio spectra and model to file, using this filename.
+        Use None to not write to file.
 
     Returns:
     --------
@@ -438,59 +467,60 @@ def SED(freq, freqs, fluxes, errs, models='pow', figname=None):
     p = 0.5
 
     # initial guesses of different models
-    params = { 'pow' : [S_max,alpha],
-            'powcibreak' : [S_max, alpha, nu_br],
-            'powjpbreak' : [S_max, alpha, nu_br],
-            'curve' : [S_max, nu_max, 1, alpha],
-            'ssa' : [S_max, beta, nu_max],
-            'ssacibreak' : [S_max, beta, nu_max, nu_br],
-            'ssajpbreak' : [S_max, beta, nu_max, nu_br],
-            'ffa' : [S_max, alpha, nu_max],
-            'bicffa' : [S_max, alpha, p, nu_max],
-            'bicffacibreak' : [S_max, alpha, p, nu_max, nu_br],
-            'bicffajpbreak' : [S_max, alpha, p, nu_max, nu_br]}
+    params = {'pow': [S_max, alpha],
+              'powcibreak': [S_max, alpha, nu_br],
+              'powjpbreak': [S_max, alpha, nu_br],
+              'curve': [S_max, nu_max, 1, alpha],
+              'ssa': [S_max, beta, nu_max],
+              'ssacibreak': [S_max, beta, nu_max, nu_br],
+              'ssajpbreak': [S_max, beta, nu_max, nu_br],
+              'ffa': [S_max, alpha, nu_max],
+              'bicffa': [S_max, alpha, p, nu_max],
+              'bicffacibreak': [S_max, alpha, p, nu_max, nu_br],
+              'bicffajpbreak': [S_max, alpha, p, nu_max, nu_br]}
 
     # different SED models from functions above
-    funcs = {   'pow' : powlaw,
-                'powcibreak' : pow_CIbreak,
-                'powjpbreak' : pow_JPbreak,
-                'curve' : curve,
-                'ssa' : SSA,
-                'ssacibreak' : SSA_CIbreak,
-                'ssajpbreak' : SSA_JPbreak,
-                'ffa' : FFA,
-                'bicffa' : Bic98_FFA,
-                'bicffacibreak' : Bic98_FFA_CIbreak,
-                'bicffajpbreak' : Bic98_FFA_JPbreak}
+    funcs = {'pow': powlaw,
+             'powcibreak': pow_CIbreak,
+             'powjpbreak': pow_JPbreak,
+             'curve': curve,
+             'ssa': SSA,
+             'ssacibreak': SSA_CIbreak,
+             'ssajpbreak': SSA_JPbreak,
+             'ffa': FFA,
+             'bicffa': Bic98_FFA,
+             'bicffacibreak': Bic98_FFA_CIbreak,
+             'bicffajpbreak': Bic98_FFA_JPbreak}
 
     # matplotlib colours
-    colours = { 'pow' : 'black',
-            'powcibreak' : 'b',
-            'powjpbreak' : 'violet',
-            'curve' : 'r',
-            'ssa' : 'g',
-            'ssacibreak' : 'r',
-            'ssajpbreak' : 'g',
-            'ffa' : 'orange',
-            'bicffa' : 'r',
-            'bicffacibreak' : 'b',
-            'bicffajpbreak' : 'r'}
+    colours = {'pow': 'black',
+               'powcibreak': 'b',
+               'powjpbreak': 'violet',
+               'curve': 'r',
+               'ssa': 'g',
+               'ssacibreak': 'r',
+               'ssajpbreak': 'g',
+               'ffa': 'orange',
+               'bicffa': 'r',
+               'bicffacibreak': 'b',
+               'bicffajpbreak': 'r'}
 
     # labels
-    labels = {  'pow' : 'Power law',
-                'powcibreak' : 'Power law\n + CI break',
-                'powjpbreak' : 'Power law\n + JP break',
-                'curve' : 'Tschager+03 Curve',
-                'ssa' : 'Single SSA',
-                'ssacibreak' : 'Single SSA\n + CI break',
-                'ssajpbreak' : 'Single SSA\n + JP break',
-                'ffa' : 'Single FFA',
-                'bicffa' : 'Bicknell+98 FFA',
-                'bicffacibreak' : 'Bicknell+98 FFA\n + CI break',
-                'bicffajpbreak' : 'Bicknell+98 FFA\n + JP break'}
+    labels = {'pow': 'Power law',
+              'powcibreak': 'Power law\n + CI break',
+              'powjpbreak': 'Power law\n + JP break',
+              'curve': 'Tschager+03 Curve',
+              'ssa': 'Single SSA',
+              'ssacibreak': 'Single SSA\n + CI break',
+              'ssajpbreak': 'Single SSA\n + JP break',
+              'ffa': 'Single FFA',
+              'bicffa': 'Bicknell+98 FFA',
+              'bicffacibreak': 'Bicknell+98 FFA\n + CI break',
+              'bicffajpbreak': 'Bicknell+98 FFA\n + JP break'}
 
     # store used models, fitted parameters and errors, fitted fluxes, reduced chi squared and BIC
-    fit_models,fit_params,fit_param_errors,fitted_fluxes,rcs,BICs = [],[],[],[],[],np.array([])
+    fit_models, fit_params, fit_param_errors, fitted_fluxes, rcs = [], [], [], [], []
+    BICs = np.array([])
 
     # convert single model to list
     if type(models) is str:
@@ -503,37 +533,40 @@ def SED(freq, freqs, fluxes, errs, models='pow', figname=None):
         if len(freqs) >= len(params[model])+1:
             try:
                 # perform a least squares fit
-                popt, pcov = opt.curve_fit(funcs[model], freqs, fluxes, p0 = params[model], sigma = errs, maxfev = 10000)
+                popt, pcov = opt.curve_fit(funcs[model], freqs, fluxes, p0=params[model],
+                                           sigma=errs, maxfev=10000)
 
                 # add all fit info to lists
                 fit_models.append(model)
                 fit_params.append(popt)
                 fit_param_errors.append(np.sqrt(np.diag(pcov)))
-                RCS,bic = fit_info(fluxes,funcs[model](freqs,*popt),errs,len(popt))
+                RCS, bic = fit_info(fluxes, funcs[model](freqs, *popt), errs, len(popt))
                 rcs.append(RCS)
-                BICs = np.append(BICs,bic)
-                fitted_fluxes.append(funcs[model](freq,*popt))
-            except (ValueError,RuntimeError) as e:
+                BICs = np.append(BICs, bic)
+                fitted_fluxes.append(funcs[model](freq, *popt))
+            except (ValueError, RuntimeError) as e:
                 print("Couldn't find good fit for {0} model.".format(model))
                 print(e)
 
     # get lists of names, functions, colours and labels for all used models
-    names = [funcs[model].__code__.co_varnames[1:funcs[model].__code__.co_argcount] for model in fit_models]
+    names = [funcs[model].__code__.co_varnames[1:funcs[model].__code__.co_argcount]
+             for model in fit_models]
     funcs = [funcs[model] for model in fit_models]
     colours = [colours[model] for model in fit_models]
     labels = [labels[model] for model in fit_models]
 
     # write figure for this source
     if figname is not None and len(fit_models) > 0:
-        plot_spectra(freqs, fluxes, errs, funcs, names, fit_params, fit_param_errors, rcs, BICs, colours, labels, figname, model_selection='all')
+        plot_spectra(freqs, fluxes, errs, funcs, names, fit_params, fit_param_errors,
+                     rcs, BICs, colours, labels, figname, model_selection='all')
 
     return fit_models, names, fit_params, fit_param_errors, fitted_fluxes, rcs, BICs
 
 
 def get_pixel_area(fits, flux=0, nans=False, ra_axis=0, dec_axis=1, w=None):
-
-    """For a given image, get the area and solid angle of all non-nan pixels or all pixels below a certain flux (doesn't count pixels=0).
-    The RA and DEC axes follow the WCS convention (i.e. starting from 0).
+    """For a given image, get the area and solid angle of all non-nan pixels or
+    all pixels below a certain flux (doesn't count pixels=0). The RA and DEC axes
+    follow the WCS convention (i.e. starting from 0).
 
     Arguments:
     ----------
@@ -576,17 +609,17 @@ def get_pixel_area(fits, flux=0, nans=False, ra_axis=0, dec_axis=1, w=None):
 
     area = (count*np.abs(w.wcs.cdelt[ra_axis])*np.abs(w.wcs.cdelt[dec_axis]))
     solid_ang = area*(np.pi/180)**2
-    return area,solid_ang
+    return area, solid_ang
 
 
 def axis_lim(data, func, perc=10):
-
     """Return an axis limit value a certain % beyond the min/max value of a dataset.
 
     Arguments:
     ----------
     data : list-like
-        A list-like object input into min() or max(). Usually this will be a numpy array or pandas Series.
+        A list-like object input into min() or max(). Usually this will be a numpy array or
+        pandas Series.
     func : function
         max or min.
 
@@ -616,8 +649,8 @@ def axis_lim(data, func, perc=10):
 
 
 def get_stats(data):
-
-    """Return the median, mean, standard deviation, standard error and rms of the median absolute deviation (mad) of the non-nan values in a list.
+    """Return the median, mean, standard deviation, standard error and rms of
+    the median absolute deviation (mad) of the non-nan values in a list.
 
     Arguments:
     ----------
@@ -671,9 +704,10 @@ def remove_extn(filename):
     # do this in case more than one '.' in file name
     return '.'.join(filename.split('.')[:-1])
 
-def config2dic(filepath, main_dir, verbose=False):
 
-    """Read a configuration file and create an dictionary of arguments from its contents, which will usually be passed into a new object instance.
+def config2dic(filepath, main_dir, verbose=False):
+    """Read a configuration file and create an dictionary of arguments
+    from its contents, which will usually be passed into a new object instance.
 
     Arguments:
     ----------
@@ -690,7 +724,8 @@ def config2dic(filepath, main_dir, verbose=False):
     Returns:
     --------
     args_dict : dict
-        A dictionary of arguments, to be passed into some function, usually a new object instance."""
+        A dictionary of arguments, to be passed into some function, usually a new object
+        instance."""
 
     # open file and read contents
     config_file = open(filepath)
@@ -699,7 +734,7 @@ def config2dic(filepath, main_dir, verbose=False):
 
     # set up dictionary of arguments based on their types
     for line in txt.split('\n'):
-        if len(line) > 0 and line.replace(' ','')[0] != '#':
+        if len(line) > 0 and line.replace(' ', '')[0] != '#':
             # use '=' as delimiter and strip whitespace
             split = line.split('=')
             key = split[0].strip()
@@ -708,16 +743,15 @@ def config2dic(filepath, main_dir, verbose=False):
 
             # if parameter is filename, store the filepath
             if key == 'filename':
-                val = find_file(val,main_dir,verbose=verbose)
+                val = find_file(val, main_dir, verbose=verbose)
 
-            args_dict.update({key : val})
+            args_dict.update({key: val})
 
     config_file.close()
     return args_dict
 
 
 def parse_string(val):
-
     """Parse a string to another data type, based on its value.
 
     Arguments:
@@ -732,16 +766,17 @@ def parse_string(val):
 
     if val.lower() == 'none':
         val = None
-    elif val.lower() in ('true','false'):
+    elif val.lower() in ('true', 'false'):
         val = (val.lower() == 'true')
-    elif val.replace('.','',1).replace('e','').replace('-','').isdigit():
+    elif val.replace('.', '', 1).replace('e', '').replace('-', '').isdigit():
         val = float(val)
 
     return val
 
-def new_path(filepath):
 
-    """For a given input filepath, return the path after having moved into a new directory. This will add '../' to the beginning of relative filepaths.
+def new_path(filepath):
+    """For a given input filepath, return the path after having moved into a new
+    directory. This will add '../' to the beginning of relative filepaths.
 
     Arguments:
     ----------
@@ -759,9 +794,11 @@ def new_path(filepath):
 
     return filepath
 
-def find_file(filepath,main_dir,verbose=True):
 
-    """Look for a file in specific paths. Look one directory up if filepath is relative, otherwise look in main directory, otherwise raise exception.
+def find_file(filepath, main_dir, verbose=True):
+
+    """Look for a file in specific paths. Look one directory up if filepath is relative,
+    otherwise look in main directory, otherwise raise exception.
 
     Arguments:
     ----------
@@ -776,18 +813,19 @@ def find_file(filepath,main_dir,verbose=True):
         The path to where the file was found."""
 
     # raise exception if file still not found
-    if not (os.path.exists(filepath) or os.path.exists('{0}/{1}'.format(main_dir,filepath)) or os.path.exists(new_path(filepath))):
-        raise Exception("Can't find file - {0}. Ensure this file is in input path or --main-dir.\n".format(filepath))
+    if not (os.path.exists(filepath) or os.path.exists('{0}/{1}'.format(main_dir, filepath))
+            or os.path.exists(new_path(filepath))):
+        raise Exception("Can't find file - {0}. Ensure this file is in input "
+                        "path or --main-dir.\n".format(filepath))
     # otherwise update path to where file exists
     elif not os.path.exists(filepath):
         # look in main directory if file doesn't exist in relative filepath
-        if os.path.exists('{0}/{1}'.format(main_dir,filepath)):
+        if os.path.exists('{0}/{1}'.format(main_dir, filepath)):
             if verbose:
-                print("Looking in '{0}' for '{1}'.".format(main_dir,filepath))
-            filepath = '{0}/{1}'.format(main_dir,filepath)
+                print("Looking in '{0}' for '{1}'.".format(main_dir, filepath))
+            filepath = '{0}/{1}'.format(main_dir, filepath)
         # update directory path if file is relative path
         else:
             filepath = new_path(filepath)
 
     return filepath
-
