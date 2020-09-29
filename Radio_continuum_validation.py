@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 """Input an radio continuum image and produce a validation report (in html) in a directory named after the image, which summarises
 several validation tests/metrics (e.g. astrometry, flux scale, source counts, etc) and whether the data passed or failed these tests.
@@ -33,7 +33,7 @@ Options:
   -x --no-write             Don't write any files except the html report and any files output from BANE and Aegean. [default: False].
   -m --SEDs=<models>        A comma-separated list of SED models to fit to the radio spectra ('pow','SSA','FFA','curve',etc) [default: None].
   -e --SEDfig=<extn>        Write figures for each SED model with this file extension (may significantly slow down script) [default: None].
-  -t --telescope=<name>     Unique name of the telescope or survey to give to the main catalogue (not used when -A used). [default: MeerKAT].
+  -t --telescope=<name>     Unique name of the telescope or survey to give to the main catalogue (not used when -A used). [default: ASKAP].
   -d --main-dir=<path>      The absolute path to the main directory where this script and other required files are located [default: $ACES/UserScripts/col52r].
   -n --ncores=<num>         The number of cores (per node) to use when running BANE and Aegean (using >=20 cores may result in memory error) [default: 8].
   -b --nbins=<num>          The number of bins to use when performing source counts [default: 50].
@@ -46,6 +46,7 @@ import os
 import sys
 import glob
 import warnings
+import matplotlib as mpl
 from functions import *
 from radio_image import radio_image
 from catalogue import catalogue
@@ -71,7 +72,6 @@ except SyntaxError:
     sys.exit()
 
 # don't use normal display environment unless user wants to view plots on screen
-import matplotlib as mpl
 if args['--source'] != 'screen':
     mpl.use('Agg')
 

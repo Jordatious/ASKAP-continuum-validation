@@ -550,7 +550,7 @@ class catalogue(object):
                     self.dec[self.name] = self.dec[self.name][indices]
 
                 # reset indices of pandas series
-                if self.name in list(self.flux.keys()):
+                if self.name in self.flux:
                     self.flux[self.name] = self.flux[self.name][indices].reset_index(drop=True)
                     self.flux_err[self.name] = self.flux_err[self.name][indices].reset_index(
                         drop=True)
@@ -558,13 +558,13 @@ class catalogue(object):
                         self.rms[self.name] = self.rms[self.name][indices].reset_index(drop=True)
 
                 # only update these for cross-matched catalogues
-                if self.name in list(self.sep.keys()):
+                if self.name in self.sep:
                     self.sep[self.name] = self.sep[self.name][indices].reset_index(drop=True)
                     self.dRAsec[self.name] = self.dRAsec[self.name][indices].reset_index(drop=True)
                     self.dRA[self.name] = self.dRA[self.name][indices].reset_index(drop=True)
                     self.dDEC[self.name] = self.dDEC[self.name][indices].reset_index(drop=True)
 
-                if self.name in list(self.si.keys()):
+                if self.name in self.si:
                     self.si[self.name] = self.si[self.name][indices].reset_index(drop=True)
 
         # reset indices and catalogue length after change has been made
@@ -980,8 +980,8 @@ class catalogue(object):
                 if join_type == '1and2':
                     matched_df = pd.concat([self.df, cat.df, sepdf], axis=1, join='inner')
                 elif join_type == '1':
-                    matched_df = pd.concat([self.df, cat.df, sepdf], axis=1,
-                                           join_axes=[self.df.index])
+                    matched_df = pd.concat([self.df, cat.df, sepdf], 
+                            axis=1).reindex(self.df.index)
 
                 # reset indices and overwrite data frame with matched one
                 matched_df = matched_df.reset_index(drop=True)
@@ -1102,7 +1102,7 @@ class catalogue(object):
 
             # don't derive spectral indices if there aren't 2+ catalogues to use,
             # but just derive flux at given frequency from a typical spectral index
-            if (num_cats <= 1 or not fit_flux) and self.name in list(self.flux.keys()) and\
+            if (num_cats <= 1 or not fit_flux) and self.name in self.flux and\
             (redo or best_fitted_flux not in self.df.columns):
                 self.est_fitted_flux(best_fitted_flux, best_fitted_ratio, freq, max_cat)
 
@@ -1240,7 +1240,7 @@ class catalogue(object):
 
             # iterate through all catalogues and only take fluxes
             # that aren't nan and optionally don't include main catalogue
-            for cat in list(self.flux.keys()):
+            for cat in self.flux:
                 flux = self.flux[cat].iloc[i]
                 if not np.isnan(flux) and (cat != self.name or cat_name == 'all'):
                     fluxes = np.append(fluxes, flux)
@@ -1302,7 +1302,7 @@ class catalogue(object):
                 if len(mods) > 0:
                     best_flux = fluxes[np.where(BICs == min(BICs))[0][0]]
                     self.df.loc[i, best_fitted_flux] = best_flux
-                    if self.name in list(self.flux.keys()):
+                    if self.name in self.flux:
                         self.df.loc[i, best_fitted_ratio] = best_flux / self.flux[self.name][i]
 
                 # iterate through each model and append fitted parameters
@@ -1318,7 +1318,7 @@ class catalogue(object):
                             self.df[col] = np.full(len(self.df), np.nan)
 
                     self.df.loc[i, fitted_flux_col] = fluxes[j]
-                    if self.name in list(self.flux.keys()):
+                    if self.name in self.flux:
                         self.df.loc[i, fitted_ratio_col] = fluxes[j] / self.flux[self.name][i]
                     self.df.loc[i, rcs_col] = rcs[j]
                     self.df.loc[i, BIC_col] = BICs[j]
@@ -1374,5 +1374,5 @@ class catalogue(object):
         cat.cutout_box(self.ra_bounds, self.dec_bounds, redo=redo, verbose=verbose,
                        write=write_any)
         self.cross_match(cat, redo=redo, write=write_all)
-        if cat.name in self.cat_list and self.name in list(self.flux.keys()):
+        if cat.name in self.cat_list and self.name in self.flux:
             self.fit_spectra(cat_name=cat.name, redo=redo, write=write_all)

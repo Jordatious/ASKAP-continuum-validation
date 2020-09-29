@@ -135,14 +135,14 @@ class radio_image(object):
         self.date = self.header_key(head, 'DATE-OBS')
         self.duration = self.header_key(head, 'DURATION', floatify=True)
 
-        # get MeerKAT soft version from history in header if it exists
+        # get ASKAP soft version from history in header if it exists
         self.soft_version = ''
         self.pipeline_version = ''
         if 'HISTORY' in list(head.keys()):
             for val in head['HISTORY']:
-                if 'MeerKATsoft version' in val:
+                if 'ASKAPsoft version' in val:
                     self.soft_version = val.split('/')[-1].split()[-1].replace(',', '')
-                if 'MeerKAT pipeline version' in val:
+                if 'ASKAP pipeline version' in val:
                     self.pipeline_version = val.split()[-1].replace(',', '')
 
         # derive duration in hours
@@ -318,7 +318,8 @@ class radio_image(object):
             print("Multiplying image by {0}".format(flux_factor))
 
         # Shift the central RA/DEC in degrees, and multiply the image by the flux
-        # factor (x1 by default) WCS axes start at 0 but fits header axes start at 1
+        # factor (x1 by default) 
+        # WCS axes start at 0 but fits header axes start at 1
         self.fits.header['CRVAL' + str(self.ra_axis+1)] += dRA/3600
         self.fits.header['CRVAL' + str(self.dec_axis+1)] += dDEC/3600
         self.fits.data[0][0] *= flux_factor

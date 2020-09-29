@@ -3,6 +3,7 @@ import collections
 import warnings
 import numpy as np
 import pandas as pd
+import matplotlib as mpl
 from functions import *
 from datetime import datetime
 import matplotlib.pyplot as plt
@@ -264,7 +265,7 @@ class report(object):
         <h4 align="middle"><i>File: '{0}'</i></h3>
         <table class="reportTable">
             <tr>
-                <th>MeerKATsoft<br>version</th>
+                <th>ASKAPsoft<br>version</th>
                 <th>Pipeline<br>version</th>
                 <th>Synthesised Beam<br>(arcsec)</th>
                 <th>Median r.m.s.<br>(uJy)</th>
@@ -385,14 +386,14 @@ class report(object):
                     val = np.abs(self.metric_val[metric]-1)
                     good_condition = val < 0.05
                     uncertain_condition = val < 0.1
-                    self.metric_source[metric] = 'Median flux density ratio [MeerKAT / {0}]'.format(
+                    self.metric_source[metric] = 'Median flux density ratio [ASKAP / {0}]'.format(
                         self.metric_source[metric])
                 # uncertainty on flux ratio less than 10/20%?
                 elif metric == 'Flux Ratio Uncertainty':
                     good_condition = self.metric_val[metric] < 0.1
                     uncertain_condition = self.metric_val[metric] < 0.2
                     self.metric_source[metric] = 'R.M.S. of median flux density ratio '
-                    '[MeerKAT / {0}]'.format(self.metric_source[metric])
+                    '[ASKAP / {0}]'.format(self.metric_source[metric])
                     self.metric_source[metric] += ' (estimated from median absolute deviation '
                     'from median)'
                 # positional offset < 1/5 arcsec
@@ -400,13 +401,13 @@ class report(object):
                     good_condition = self.metric_val[metric] < 1
                     uncertain_condition = self.metric_val[metric] < 5
                     self.metric_source[metric] = 'Median positional offset (arcsec) '
-                    '[MeerKAT-{0}]'.format(self.metric_source[metric])
+                    '[ASKAP-{0}]'.format(self.metric_source[metric])
                 # uncertainty on positional offset < 1/5 arcsec
                 elif metric == 'Positional Offset Uncertainty':
                     good_condition = self.metric_val[metric] < 5
                     uncertain_condition = self.metric_val[metric] < 10
                     self.metric_source[metric] = 'R.M.S. of median positional offset (arcsec) '
-                    '[MeerKAT-{0}]'.format(self.metric_source[metric])
+                    '[ASKAP-{0}]'.format(self.metric_source[metric])
                     self.metric_source[metric] += ' (estimated from median absolute deviation '
                     'from median)'
                 # reduced chi-squared of source counts < 3/50?
@@ -446,7 +447,7 @@ class report(object):
 
     def write_pipeline_offset_params(self):
 
-        """Write a txt file with offset params for MeerKATsoft pipeline for user to easily
+        """Write a txt file with offset params for ASKAPsoft pipeline for user to easily
         import into config file, and then drop them from metrics.
         See http://www.atnf.csiro.au/computing/software/askapsoft/sdp/docs/current/pipelines
         /ScienceFieldContinuumImaging.html?highlight=offset"""
@@ -546,7 +547,7 @@ class report(object):
                 self.metric_level['Spectral Index']), self.metric_val['Spectral Index']))
 
         by = ''
-        if self.cat.name != 'MeerKAT':
+        if self.cat.name != 'ASKAP':
             by = """ by <a href="mailto:Jordan.Collier@csiro.au">Jordan Collier</a>"""
         # Close table, write time generated, and close html file
         self.html.write("""</tr>
@@ -680,7 +681,7 @@ class report(object):
             if usePeak:
                 xlabel += ' ({0})'.format(self.cat.flux_unit.replace('j', 'J'))
             else:
-                xlabel += r'$ / \sigma_{rms}}$'
+                xlabel += r'$\sigma_{rms}}$'
             ylabel = r'${\rm S_{int} / S_{peak}}$'
 
         if self.plot_to != 'screen':
@@ -904,14 +905,14 @@ class report(object):
             '>Hopkins+03</a>)\n'
         txt += r'$\chi^2_{red}$: %.2f' % red_chi_sq
 
-        # Legend labels for the Norris data and line, and the MeerKAT data
+        # Legend labels for the Norris data and line, and the ASKAP data
         xlab = 'Norris+11'
         leg_labels = [xlab, '{0}th degree polynomial fit to {1}'.format(deg, xlab), self.cat.name]
 
         # write reduced chi squared to report table
         self.html.write('</td><td>{0:.2f}<br>'.format(red_chi_sq))
 
-        # Plot MeerKAT data on top of Norris+11 data
+        # Plot ASKAP data on top of Norris+11 data
         self.plot(df['logS'],
                   y=df['logCounts'],
                   yerr=(df['logErrDown'], df['logErrUp']),
@@ -1204,7 +1205,6 @@ class report(object):
         if self.write:
             # derive name of thumbnail file
             thumb = '{0}_thumb.png'.format(filename[:-1-len(self.plot_to)])
-
             # don't produce plot if file exists and user didn't specify to re-do
             if os.path.exists(filename) and not redo:
                 if self.verbose:
@@ -1521,7 +1521,7 @@ class report(object):
                       in zip(self.cat.dRA[name2][indices], self.cat.dDEC[name2][indices])]
 
         # plot the positional offsets across the sky
-        self.plot(x,
+        self.plot(x=x,
                   y=y,
                   c=c,
                   title=title,
@@ -1566,7 +1566,7 @@ class report(object):
             fig = plt.figure(**self.fig_size)
 
             title = "{0} / {1} flux ratio".format(name1, flux_ratio_type)
-            xlabel = 'S/N'
+            xlabel = 'S / N'
             ylabel = 'Flux Density Ratio'
             if self.plot_to != 'screen':
                 filename = '{0}/{1}_{2}_ratio.{3}'.format(self.figDir, name1, name2, self.plot_to)
@@ -1582,7 +1582,7 @@ class report(object):
             txt += r'\overline{Ratio}$: %.2f\n' % ratio_mean
             txt += r'\sigma_{Ratio}$: %.2f\n' % ratio_std
             txt += r'\sigma_{\overline{Ratio}}$: %.2f' % ratio_err
-
+            print(txt)
             # for html plots, add flux labels for every data point
             if flux_ratio_type == name2:
                 labels = ['{0} flux = {1:.2f} mJy, {2} flux = {3:.2f} mJy'.format(name1, flux1,
@@ -1624,13 +1624,6 @@ class report(object):
             title += " by sky position"
             xlabel = 'RA (deg)'
             ylabel = 'DEC (deg)'
-            if self.plot_to != 'screen':
-                filename = '{0}/{1}_{2}_ratio_sky.{3}'.format(self.figDir, name1, name2,
-                                                              self.plot_to)
-
-            # get non-nan data shared between each used axis as a numpy array
-            x, y, c, indices = self.shared_indices(self.cat.ra[name2], yaxis=self.cat.dec[name2],
-                                                   caxis=logRatio)
 
             # format labels according to destination of figure
             if self.plot_to == 'html':
