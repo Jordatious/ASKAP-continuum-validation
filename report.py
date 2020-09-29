@@ -1521,7 +1521,7 @@ class report(object):
                       in zip(self.cat.dRA[name2][indices], self.cat.dDEC[name2][indices])]
 
         # plot the positional offsets across the sky
-        self.plot(x=x,
+        self.plot(x,
                   y=y,
                   c=c,
                   title=title,
@@ -1582,7 +1582,6 @@ class report(object):
             txt += r'\overline{Ratio}$: %.2f\n' % ratio_mean
             txt += r'\sigma_{Ratio}$: %.2f\n' % ratio_std
             txt += r'\sigma_{\overline{Ratio}}$: %.2f' % ratio_err
-            print(txt)
             # for html plots, add flux labels for every data point
             if flux_ratio_type == name2:
                 labels = ['{0} flux = {1:.2f} mJy, {2} flux = {3:.2f} mJy'.format(name1, flux1,
