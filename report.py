@@ -1623,6 +1623,11 @@ class report(object):
             title += " by sky position"
             xlabel = 'RA (deg)'
             ylabel = 'DEC (deg)'
+            if self.plot_to != 'screen':
+                filename = '{0}/{1}_{2}_ratio_sky.{3}'.format(self.figDir,name1,name2,self.plot_to)
+
+            #get non-nan data shared between each used axis as a numpy array
+            x,y,c,indices = self.shared_indices(self.cat.ra[name2],yaxis=self.cat.dec[name2],caxis=logRatio)
 
             # format labels according to destination of figure
             if self.plot_to == 'html':
