@@ -1,12 +1,15 @@
 import os
 import warnings
-from functions import *
-import numpy as np
-from astropy.io import fits as f
-from astropy.wcs import WCS
-from astropy.coordinates import SkyCoord
-from astropy.utils.exceptions import AstropyWarning
 from inspect import currentframe, getframeinfo
+
+import numpy as np
+from astropy.coordinates import SkyCoord
+from astropy.io import fits as f
+from astropy.utils.exceptions import AstropyWarning
+from astropy.wcs import WCS
+
+from functions import remove_extn, get_pixel_area
+
 
 # ignore annoying astropy warnings and set my own obvious warning output
 warnings.simplefilter('ignore', category=AstropyWarning)
@@ -68,7 +71,6 @@ class radio_image(object):
         # expected positional error, given by FWHM/SNR (Condon, 1997)
         self.posErr = int(round(self.bmaj/SNR))
 
-
     def header_key(self, header, key, floatify=False):
 
         """Return the value of the key from a fits header. If key doesn't exist,
@@ -101,7 +103,6 @@ class radio_image(object):
             return float(header[key])
         else:
             return header[key]
-
 
     def header_specs(self, fits, verbose=False):
 
@@ -228,7 +229,6 @@ class radio_image(object):
         else:
             print("'{0}' already exists. Skipping BANE.".format(self.rms_map))
 
-
     def run_Aegean(self, params='', ncores=8, write=True, redo=False):
 
         """Perform source finding on image using Aegean, producing just a component
@@ -237,7 +237,7 @@ class radio_image(object):
         Keyword arguments:
         ------------------
         params : string
-            Any extra parameters to pass into Aegean (apart from cores, noise, 
+            Any extra parameters to pass into Aegean (apart from cores, noise,
             background and table).
         ncores : int
             The number of cores to use (per node) when running BANE and Aegean.
@@ -318,7 +318,7 @@ class radio_image(object):
             print("Multiplying image by {0}".format(flux_factor))
 
         # Shift the central RA/DEC in degrees, and multiply the image by the flux
-        # factor (x1 by default) 
+        # factor (x1 by default)
         # WCS axes start at 0 but fits header axes start at 1
         self.fits.header['CRVAL' + str(self.ra_axis+1)] += dRA/3600
         self.fits.header['CRVAL' + str(self.dec_axis+1)] += dDEC/3600

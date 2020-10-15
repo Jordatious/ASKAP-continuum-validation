@@ -1,15 +1,18 @@
-import os
 import glob
+import os
 import warnings
-from functions import *
+from inspect import currentframe, getframeinfo
+
 import numpy as np
 import pandas as pd
-from astropy.io import fits as f
-from astropy.table import Table
 from astropy.coordinates import SkyCoord
+from astropy.io import fits as f
 from astropy.io.votable import parse_single_table
+from astropy.table import Table
 from astropy.utils.exceptions import AstropyWarning
-from inspect import currentframe, getframeinfo
+
+from functions import config2dic, flux_at_freq, SED, two_freq_power_law, axis_lim
+
 
 # ignore annoying astropy warnings and set my own obvious warning output
 warnings.simplefilter('ignore', category=AstropyWarning)
@@ -264,7 +267,6 @@ class catalogue(object):
 
         # Initialise all the key fields, including positions and fluxes.
         self.set_key_fields(set_coords=False)
-        
 
     def unique_col_name(self, col):
 
@@ -360,8 +362,8 @@ class catalogue(object):
             self.img_peak_pos = np.where(img_data == self.img_peak_bounds)
             self.img_peak_rms = rms_map.data[self.img_peak_pos][0]
             self.dynamic_range = self.img_peak_bounds/self.img_peak_rms
-            self.img_flux = np.sum(img_data[~np.isnan(img_data)]) \
-            / (1.133*((img.bmaj * img.bmin) / (img.raPS * img.decPS)))
+            self.img_flux = np.sum(img_data[~np.isnan(img_data)]) / \
+             (1.133 * ((img.bmaj * img.bmin) / (img.raPS * img.decPS)))
 
         # Get the approximate area from catalogue
         else:
@@ -396,11 +398,9 @@ class catalogue(object):
             if self.med_si != -99:
                 print("Median spectral index is {0:.2f}.".format(self.med_si))
 
-
         # Store the initial length of the catalogue
         self.initial_count = self.count[self.name]
-
-        # Derive the fraction of resolved sources as the fraction of sources 
+        # Derive the fraction of resolved sources as the fraction of sources
         # with int flux > 3-sigma away from peak flux
         if self.name in list(self.flux.keys()):
             # Josh's method
@@ -414,7 +414,6 @@ class catalogue(object):
 
         else:
             self.resolved_frac = -1
-
 
     def set_key_fields(self, indices=None, cat=None, set_coords=True):
 
@@ -448,21 +447,22 @@ class catalogue(object):
             # set easy names for columns
             prefix = '{0}_{1}_'.format(cat.name, self.name)
             sep = prefix + 'sep'
-            dRAsec = prefix + 'dRAsec' 
-            dRA = prefix + 'dRA' 
+            dRAsec = prefix + 'dRAsec'
+            dRA = prefix + 'dRA'
             dDEC = prefix + 'dDEC'
 
             self.cat_list.append(cat.name)
-            self.count[cat.name] = len(np.where(~np.isnan(cat.df[sep]))[0]) 
+            self.count[cat.name] = len(np.where(~np.isnan(cat.df[sep]))[0])
             self.freq[cat.name] = cat.freq[cat.name]
             self.radius[cat.name] = cat.radius[cat.name]
             self.ra[cat.name] = cat.ra[cat.name]
             self.dec[cat.name] = cat.dec[cat.name]
 
             # compute the positional offsets
-            self.df[dRAsec] = (self.ra[self.name] - \
+            self.df[dRAsec] = (self.ra[self.name] -
                                self.ra[cat.name])*3600  # in seconds
-            self.df[dRA] = self.df[dRAsec]*np.cos(np.deg2rad((self.dec[self.name] + self.dec[cat.name])/2))  
+            self.df[dRA] = self.df[dRAsec]*np.cos(np.deg2rad((self.dec[self.name] +
+                                                              self.dec[cat.name])/2))
             self.df[dDEC] = (self.dec[self.name] - self.dec[cat.name])*3600
 
             # store in dictionaries
@@ -477,10 +477,11 @@ class catalogue(object):
                 self.rms[cat.name] = cat.rms[cat.name]
 
                 # write flux ratio if frequencies within 1%
-                if self.name in list(self.flux.keys()) and np.abs(cat.freq[cat.name]/self.freq[self.name]-1) < 0.01:
+                if self.name in list(self.flux.keys()) and\
+                 np.abs(cat.freq[cat.name]/self.freq[self.name]-1) < 0.01:
                     self.df[prefix + 'flux_ratio'] = self.flux[self.name]/self.flux[cat.name]
 
-            if cat.si_col != None:
+            if cat.si_col is not None:
                 self.si[cat.name] = cat.si[cat.name]
 
         # otherwise initialise or update dictionary for this instance
@@ -507,13 +508,13 @@ class catalogue(object):
                 if self.use_peak and self.peak_col is not None:
                     self.flux[self.name] = self.df[self.peak_col].copy()
 
-                    if self.peak_err_col != None:
+                    if self.peak_err_col is not None:
                         self.flux_err[self.name] = self.df[self.peak_err_col].copy()
                     else:
                         self.flux_err[self.name] = self.flux[self.name]*0.1  # 10% error
                 else:
                     self.flux[self.name] = self.df[self.flux_col].copy()
-                    if self.flux_err_col != None:
+                    if self.flux_err_col is not None:
                         self.flux_err[self.name] = self.df[self.flux_err_col].copy()
                     else:
                         self.flux_err[self.name] = self.flux[self.name]*0.1  # 10% error
@@ -539,7 +540,7 @@ class catalogue(object):
                 self.flux_err[self.name] *= factor
                 self.rms[self.name] *= factor
 
-                if self.si_col != None:
+                if self.si_col is not None:
                     self.si[self.name] = self.df[self.si_col]
 
             # otherwise just update this instance
@@ -663,8 +664,8 @@ class catalogue(object):
             RA = self.df[self.ra_col]
             DEC = self.df[self.dec_col]
 
-        if (type(ra) is tuple and (type(dec) is not tuple or len(ra) != 2)) or \
-        (type(dec) is tuple and (type(ra) is not tuple or len(dec) != 2)):
+        if (type(ra) is tuple and (type(dec) is not tuple or len(ra) != 2)) or\
+         (type(dec) is tuple and (type(ra) is not tuple or len(dec) != 2)):
             warnings.warn_explicit('RA and DEC must both be single value or a\
             tuple with two indices. Cutout not applied.\n', UserWarning,
                                    WARN, cf.f_lineno)
@@ -679,12 +680,12 @@ class catalogue(object):
 
             # cut out all rows outside RA and DEC boundaries
             if type(ra) is tuple:
-                ra_min, ra_max = axis_lim(ra, min), axis_lim(ra, max) 
+                ra_min, ra_max = axis_lim(ra, min), axis_lim(ra, max)
                 dec_min, dec_max = axis_lim(dec, min), axis_lim(dec, max)
                 if verbose:
                     print("Selecting sources with {0} <= RA <= {1} and {2} <= DEC <=\
                     {3}.".format(ra_min, ra_max, dec_min, dec_max))
-                self.df = self.df[(RA <= ra_max) & (RA >= ra_min) & (DEC <= dec_max) \
+                self.df = self.df[(RA <= ra_max) & (RA >= ra_min) & (DEC <= dec_max)
                                   & (DEC >= dec_min)]
 
             # cut out all rows outside the FOV
@@ -693,8 +694,8 @@ class catalogue(object):
                     print("Using a {0}x{0} degree box centred at {1} deg, {2} deg.".format(fov,
                                                                                            ra, dec))
                 self.df = self.df[(DEC <= dec + fov/2) & (DEC >= dec - fov/2) &
-                                    (RA <= ra + fov/2/np.cos(np.deg2rad(DEC))) &
-                                    (RA >= ra - fov/2/np.cos(np.deg2rad(DEC)))]
+                                  (RA <= ra + fov/2/np.cos(np.deg2rad(DEC))) &
+                                  (RA >= ra - fov/2/np.cos(np.deg2rad(DEC)))]
 
             if verbose:
                 print('{0} {1} sources within this region.'.format(len(self.df), self.name))
@@ -706,7 +707,6 @@ class catalogue(object):
         # if file exists, simply read in catalogue
         else:
             self.overwrite_df(filename, step='cutout', set_coords=False)
-
 
     def filter_sources(self, flux_lim=0, SNR=0, ratio_frac=0, ratio_sigma=0,
                        reject_blends=False, psf_tol=0, resid_tol=0, flags=False,
@@ -765,19 +765,19 @@ class catalogue(object):
 
             # reject faint sources
             if flux_lim != 0:
-                if self.flux_col != None:
+                if self.flux_col is not None:
                     self.df = self.df[self.flux[self.name] > flux_lim]
                     if verbose:
                         print("Rejected (faint) sources below {0} Jy.".format(flux_lim))
                         print("Number remaining: {0}.".format(len(self.df)))
                 else:
                     warnings.warn_explicit("No int flux column given. Can't reject\
-                    resolved sources based on flux.\n", UserWarning, WARN, 
+                    resolved sources based on flux.\n", UserWarning, WARN,
                                            cf.f_lineno)
 
             # reject low S/N sources
             if SNR != 0:
-                if self.flux_col != None and self.rms_val != None:
+                if self.flux_col is not None and self.rms_val is not None:
                     # reindex key fields before comparison
                     self.set_key_fields(indices=self.df.index.tolist())
                     self.df = self.df[self.flux[self.name] > SNR*self.rms[self.name]]
@@ -790,7 +790,7 @@ class catalogue(object):
 
             # reject resolved sources based on flux ratio
             if ratio_frac != 0:
-                if self.peak_col != None:
+                if self.peak_col is not None:
                     self.df = self.df[self.df[self.flux_col]/self.df[self.peak_col] <= ratio_frac]
                     if verbose:
                         print("Rejected (resolved) sources with total flux > {0}\
@@ -802,7 +802,7 @@ class catalogue(object):
 
             # reject resolved sources based on flux ratio metric
             if ratio_sigma != 0:
-                if self.peak_col != None:
+                if self.peak_col is not None:
                     uncertainty = np.sqrt(self.df[self.flux_err_col]**2 + self.df[
                         self.peak_err_col]**2)
                     if self.finder == 'selavy':
@@ -837,11 +837,11 @@ class catalogue(object):
                     if self.image is not None:
                         self.df = self.df[self.df[self.maj_col] <= psf_tol*self.image.bmaj]
                     elif self.finder == 'Aegean':
-                        self.df = self.df[self.df['{0}_a'.format(self.name)]\
+                        self.df = self.df[self.df['{0}_a'.format(self.name)]
                                           <= psf_tol*self.df['{0}_psf_a'.format(self.name)]]
                     else:
                         warnings.warn_explicit("Can't rejected resolved sources based on psf tolerance without\
-                        inputting radio_image object to read psf.\n", UserWarning, WARN, 
+                        inputting radio_image object to read psf.\n", UserWarning, WARN,
                                                cf.f_lineno)
                     if verbose:
                         print("Rejected (resolved) sources with fitted major axis\
@@ -857,7 +857,7 @@ class catalogue(object):
                 if self.finder == 'aegean':
                     # reindex key fields before comparison
                     self.set_key_fields(indices=self.df.index.tolist())
-                    self.df = self.df[self.df['{0}_residual_std'.format(self.name)]\
+                    self.df = self.df[self.df['{0}_residual_std'.format(self.name)]
                                       <= resid_tol*self.rms[self.name]]
                     if verbose:
                         print("Rejected (poorly fit) sources with standard deviation in "
@@ -870,7 +870,7 @@ class catalogue(object):
 
             # reject sources with any flags
             if flags:
-                if self.flag_col != None:
+                if self.flag_col is not None:
                     self.df = self.df[self.df[self.flag_col] == 0]
                     if verbose:
                         print("Rejecting (problematic) sources flagged as bad.")
@@ -878,7 +878,6 @@ class catalogue(object):
                 else:
                     warnings.warn_explicit("Can't reject resolved sources based on flag since flag "
                                            "column not set.\n", UserWarning, WARN, cf.f_lineno)
-
             # Drop the rejected rows, reset the key fields and write to file
             self.set_key_fields(indices=self.df.index.tolist(), set_coords=False)
             self.write_df(write, filename)
@@ -886,7 +885,6 @@ class catalogue(object):
         # if file exists, simply read in catalogue
         else:
             self.overwrite_df(filename, step='filtering', verbose=verbose)
-
 
     def cross_match(self, cat, radius='largest', join_type='1', redo=False, write=True):
 
@@ -980,8 +978,8 @@ class catalogue(object):
                 if join_type == '1and2':
                     matched_df = pd.concat([self.df, cat.df, sepdf], axis=1, join='inner')
                 elif join_type == '1':
-                    matched_df = pd.concat([self.df, cat.df, sepdf], 
-                            axis=1).reindex(self.df.index)
+                    matched_df = pd.concat([self.df, cat.df, sepdf],
+                                           axis=1).reindex(self.df.index)
 
                 # reset indices and overwrite data frame with matched one
                 matched_df = matched_df.reset_index(drop=True)
@@ -1010,7 +1008,6 @@ class catalogue(object):
 
         # add key fields from matched catalogue
         self.set_key_fields(cat=cat)
-
 
     def fit_spectra(self, cat_name=None, match_perc=0, models=['pow'], fig_extn=None,
                     GLEAM_subbands=None, GLEAM_nchans=None, fit_flux=False, redo=False,
@@ -1181,7 +1178,6 @@ class catalogue(object):
                     [self.flux[self.name], self.flux[cat_name]], [self.flux_err[self.name],
                                                                   self.flux_err[cat_name]])
 
-
     def n_point_spectra(self, fitted_flux_suffix, fitted_ratio_suffix, best_fitted_flux,
                         best_fitted_ratio, used_cats, freq, cat_name=None,
                         models=['pow'], fig_extn=None, GLEAM_subbands=None, GLEAM_nchans=None,
@@ -1251,8 +1247,9 @@ class catalogue(object):
             if GLEAM_subbands is not None and 'GLEAM' in self.cat_list:
                 GLEAM_freqs, GLEAM_fluxes, GLEAM_errs = np.array([]), np.array([]), np.array([])
                 for col in self.df.columns:
-                    if col.startswith('GLEAM_{0}_flux_'.format(GLEAM_subbands)) and\
-                    'fit' not in col and 'wide' not in col and not np.isnan(self.df.loc[i, col]):
+                    if col.startswith('GLEAM_{0}_flux_'.format(GLEAM_subbands)) and \
+                        'fit' not in col and 'wide' not in col and not np.isnan(self.df.loc[i,
+                                                                                            col]):
                         GLEAM_freq = col.split('_')[-1]
                         GLEAM_freqs = np.append(GLEAM_freqs, float(GLEAM_freq))
                         GLEAM_fluxes = np.append(GLEAM_fluxes,
@@ -1337,7 +1334,6 @@ class catalogue(object):
                         # store parameter value, error, fitted flux and ratio
                         self.df.loc[i, para_col] = params[j][k]
                         self.df.loc[i, para_err_col] = errors[j][k]
-
 
     def process_config_file(self, config_file, main_dir, redo=False, write_all=True,
                             write_any=True, verbose=False):

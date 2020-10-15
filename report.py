@@ -1,23 +1,24 @@
-import os
 import collections
+import os
 import warnings
+from datetime import datetime
+from inspect import currentframe, getframeinfo
+
+import matplotlib.image as image
+import matplotlib.pyplot as plt, mpld3
 import numpy as np
 import pandas as pd
-import matplotlib as mpl
-from functions import *
-from datetime import datetime
-import matplotlib.pyplot as plt
-import matplotlib.pyplot as mpld3
-from matplotlib import colors
-from mpld3 import plugins
-from matplotlib.patches import Ellipse
-import matplotlib.image as image
+from astropy.coordinates import SkyCoord
 from astropy.io import fits as f
 from astropy.io import votable
 from astropy.table import Table
-from astropy.coordinates import SkyCoord
 from astropy.utils.exceptions import AstropyWarning
-from inspect import currentframe, getframeinfo
+from astropy.wcs import WCS
+from matplotlib import colors
+from matplotlib.patches import Ellipse
+from mpld3 import plugins
+
+from functions import get_stats, flux_at_freq, get_pixel_area, axis_lim
 
 # ignore annoying astropy warnings and set my own obvious warning output
 warnings.simplefilter('ignore', category=AstropyWarning)
@@ -201,7 +202,7 @@ class report(object):
         self.metric_source = self.metric_val.copy()
         self.metric_count = self.metric_val.copy()
         self.metric_level = self.metric_val.copy()
-        
+
     def write_html_head(self):
 
         """Open the report html file and write the head."""
@@ -216,7 +217,7 @@ class report(object):
         <body>
             <h1 align="middle">{1} Continuum Data Validation Report</h1>""".format(self.css_style,
                                                                                    self.cat.name))
-   
+
     def write_html_img_table(self, img):
 
         """Write an observations and image and catalogue report tables derived from fits image and header.
@@ -349,9 +350,9 @@ class report(object):
                 <th>Cross-matches</th>
                 <th>Median offset<br>(arcsec)</th>
                 <th>Median flux ratio</th>
-                <th>Median spectral index</th> 
+                <th>Median spectral index</th>
                 </tr>""")
-    
+
     def get_metric_level(self, good_condition, uncertain_condition):
 
         """Return metric level 1 (good), 2 (uncertain) or 3 (bad), according to the two input conditions.
@@ -421,7 +422,7 @@ class report(object):
                     cond2 = self.metric_val[metric] < 0.2
                     good_condition = cond1 and cond2
                     uncertain_condition = self.metric_val[metric] < 0.3
-                    self.metric_source[metric] = 'Fraction of sources resolved according to ' 
+                    self.metric_source[metric] = 'Fraction of sources resolved according to '
                     'int/peak flux densities'
                 # spectral index less than 0.2 away from -0.8?
                 elif metric == 'Spectral Index':
@@ -439,7 +440,7 @@ class report(object):
                     uncertain_condition = False
 
                 # assign level to metric
-                self.metric_level[metric] = self.get_metric_level(good_condition, 
+                self.metric_level[metric] = self.get_metric_level(good_condition,
                                                                   uncertain_condition)
 
         if self.img is not None:
@@ -530,15 +531,15 @@ class report(object):
             <td {10}>{11:.2f}</td>
             <td {12}>{13}</td>
         """.format(self.html_colour(self.metric_level['Flux Ratio']), self.metric_val['Flux Ratio'],
-                        self.html_colour(self.metric_level['Flux Ratio Uncertainty']), 
+                        self.html_colour(self.metric_level['Flux Ratio Uncertainty']),
                    self.metric_val['Flux Ratio Uncertainty'],
-                        self.html_colour(self.metric_level['Positional Offset']), 
+                        self.html_colour(self.metric_level['Positional Offset']),
                    self.metric_val['Positional Offset'],
-                        self.html_colour(self.metric_level['Positional Offset Uncertainty']), 
+                        self.html_colour(self.metric_level['Positional Offset Uncertainty']),
                    self.metric_val['Positional Offset Uncertainty'],
                         self.html_colour(self.metric_level['Resolved Fraction']),
                    self.metric_val['Resolved Fraction'],
-                        self.html_colour(self.metric_level['Source Counts Reduced Chi-squared']), 
+                        self.html_colour(self.metric_level['Source Counts Reduced Chi-squared']),
                    self.metric_val['Source Counts Reduced Chi-squared'],
                         self.html_colour(self.metric_level['RMS']), self.metric_val['RMS']))
 
@@ -558,7 +559,7 @@ class report(object):
         </html>""".format(datetime.now().strftime("%Y-%m-%d %H:%M:%S"), by))
         self.html.close()
         print("Continuum validation report written to '{0}'.".format(self.name))
-        
+
     def add_html_link(self, target, link, file=True, newline=False):
 
         """Return the html for a link to a URL or file.
@@ -590,8 +591,7 @@ class report(object):
         if newline:
             html += "<br>"
         return html
-    
-    
+
     def text_to_html(self, text):
 
         """Take a string of text that may include LaTeX, and return the html
@@ -677,7 +677,7 @@ class report(object):
                 xlabel = 'S/N'
             ylabel = 'Int / Peak Flux Ratio'
         else:
-            xlabel = r'{\rm S_{peak}'
+            xlabel = r'$\rm S_{peak}$'
             if usePeak:
                 xlabel += ' ({0})'.format(self.cat.flux_unit.replace('j', 'J'))
             else:
@@ -685,7 +685,7 @@ class report(object):
             ylabel = r'${\rm S_{int} / S_{peak}}$'
 
         if self.plot_to != 'screen':
-            filename = '{0}/{1}_int_peak_ratio.{2}'.format(self.figDir, self.cat.name, 
+            filename = '{0}/{1}_int_peak_ratio.{2}'.format(self.figDir, self.cat.name,
                                                            self.plot_to)
         else:
             filename = ''
@@ -705,9 +705,9 @@ class report(object):
 
         # derive the statistics of y and store in string
         ymed, ymean, ystd, yerr, ymad = get_stats(ratio)
-        txt = r'$\widetilde{Ratio}$: %.2f\n' % ymed
-        txt += r'$\overline{Ratio}$: %.2f\n' % ymean
-        txt += r'$\sigma_{Ratio}$: %.2f\n' % ystd
+        txt = r'$\widetilde{Ratio}$: %.2f' % ymed + '\n'
+        txt += r'$\overline{Ratio}$: %.2f' % ymean + '\n'
+        txt += r'$\sigma_{Ratio}$: %.2f' % ystd + '\n'
         txt += r'$\sigma_{\overline{Ratio}}$: %.2f' % yerr
 
         # store median int/peak flux ratio and write to report table
@@ -730,7 +730,6 @@ class report(object):
                   leg_labels=leg_labels,
                   handles=[data],
                   redo=self.redo)
-
 
     def source_counts(self, fluxes, freq, rms_map=None, solid_ang=0, write=True):
 
@@ -872,7 +871,7 @@ class report(object):
         # create a figure for the source counts
         plt.close()
         fig = plt.figure(**self.fig_size)
-        title = '{0} 1.4 GHz source counts'.format(self.cat.name, self.cat.freq[self.cat.name])
+        title = '{0} 1.4 GHz source counts'.format(self.cat.name)  # self.cat.freq[self.cat.name])
         # write axes using unicode (for html) or LaTeX
         if self.plot_to == 'html':
             ylabel = "log\u2081\u2080 S\u00B2\u22C5\u2075 dN/dS [Jy\u00B9\u22C5\u2075 "
@@ -1054,7 +1053,7 @@ class report(object):
             The minimum uncertainty in the flux ratio for S/N values > 0."""
 
         return SNR[SNR > 0], 1-3*np.sqrt(2)/SNR[SNR > 0]
-    
+
     def axis_to_np(self, axis):
 
         """Return a numpy array of the non-nan data from the input axis.
@@ -1131,7 +1130,7 @@ class report(object):
         else:
             indices = np.where((~np.isnan(x)) & (~np.isnan(y)) & (~np.isnan(c)))[0]
             return x[indices], y[indices], c[indices], indices
-    
+
     def plot(self, x, y=None, c=None, yerr=None, figure=None, arrows=None, line_funcs=None,
              title='', labels=None, text=None, reverse_x=False, xlabel='', ylabel='',
              clabel='', leg_labels='', handles=[], loc='bl', ellipses=None, axis_perc=10,
@@ -1270,8 +1269,8 @@ class report(object):
 
                     for func in line_funcs:
                         xline, yline = func(xlin, ylin)
-                        # line = plt.plot(xline, yline, lw=2, color='black', linestyle='-'
-                        # , zorder=12)
+                        line = plt.plot(xline, yline, lw=2, color='black', linestyle='-',
+                                        zorder=12)
 
                 # doing this here forces the lines in html plots to not increase the axis limits
                 if reverse_x:
@@ -1364,7 +1363,7 @@ class report(object):
             self.html.write(self.add_html_link(filename, thumb))
 
         plt.close()
-        
+
     def validate(self, name1, name2, redo=False):
 
         """Produce a validation report between two catalogues, and optionally produce plots.
@@ -1423,13 +1422,13 @@ class report(object):
         # derive the statistics of x and y and store in string to annotate on figure
         dRAmed, dRAmean, dRAstd, dRAerr, dRAmad = get_stats(x)
         dDECmed, dDECmean, dDECstd, dDECerr, dDECmad = get_stats(y)
-        txt = r'$\widetilde{\Delta RA}$: %.2f\n' % dRAmed
-        txt += r'$\overline{\Delta RA}$: %.2f\n' % dRAmean
-        txt += r'$\sigma_{\Delta RA}$: %.2f\n' % dRAstd
-        txt += r'$\sigma_{\overline{\Delta RA}}$: %.2f\n' % dRAerr
-        txt += r'$\widetilde{\Delta DEC}$: %.2f\n' % dDECmed
-        txt += r'$\overline{\Delta DEC}$: %.2f\n' % dDECmean
-        txt += r'$\sigma_{\Delta DEC}$: %.2f\n' % dDECstd
+        txt = r'$\widetilde{\Delta RA}$: %.2f' % dRAmed + '\n'
+        txt += r'$\overline{\Delta RA}$: %.2f' % dRAmean + '\n'
+        txt += r'$\sigma_{\Delta RA}$: %.2f' % dRAstd + '\n'
+        txt += r'$\sigma_{\overline{\Delta RA}}$: %.2f' % dRAerr + '\n'
+        txt += r'$\widetilde{\Delta DEC}$: %.2f' % dDECmed + '\n'
+        txt += r'$\overline{\Delta DEC}$: %.2f' % dDECmean + '\n'
+        txt += r'$\sigma_{\Delta DEC}$: %.2f' % dDECstd + '\n'
         txt += r'$\sigma_{\overline{\Delta DEC}}$: %.2f' % dDECerr
 
         # create an ellipse at the position of the median with axes of standard deviation
@@ -1498,7 +1497,7 @@ class report(object):
                   redo=redo)
 
         # plot the positional offsets across the sky
-        title += " by sky position"
+        title += "by sky position"
         xlabel = 'RA (deg)'
         ylabel = 'DEC (deg)'
         if self.plot_to != 'screen':
@@ -1578,10 +1577,10 @@ class report(object):
 
             # derive the ratio statistics and store in string to append to plot
             ratio_med, ratio_mean, ratio_std, ratio_err, ratio_mad = get_stats(y)
-            txt = r'\widetilde{Ratio}$: %.2f\n' % ratio_med
-            txt += r'\overline{Ratio}$: %.2f\n' % ratio_mean
-            txt += r'\sigma_{Ratio}$: %.2f\n' % ratio_std
-            txt += r'\sigma_{\overline{Ratio}}$: %.2f' % ratio_err
+            txt = r'$\widetilde{Ratio}$: %.2f' % ratio_med + '\n'
+            txt += r'$\overline{Ratio}$: %.2f' % ratio_mean + '\n'
+            txt += r'$\sigma_{Ratio}$: %.2f' % ratio_std + '\n'
+            txt += r'$\sigma_{\overline{Ratio}}$: %.2f' % ratio_err
             # for html plots, add flux labels for every data point
             if flux_ratio_type == name2:
                 labels = ['{0} flux = {1:.2f} mJy, {2} flux = {3:.2f} mJy'.format(name1, flux1,
@@ -1624,10 +1623,12 @@ class report(object):
             xlabel = 'RA (deg)'
             ylabel = 'DEC (deg)'
             if self.plot_to != 'screen':
-                filename = '{0}/{1}_{2}_ratio_sky.{3}'.format(self.figDir,name1,name2,self.plot_to)
+                filename = '{0}/{1}_{2}_ratio_sky.{3}'.format(self.figDir, name1, name2,
+                                                              self.plot_to)
 
-            #get non-nan data shared between each used axis as a numpy array
-            x,y,c,indices = self.shared_indices(self.cat.ra[name2],yaxis=self.cat.dec[name2],caxis=logRatio)
+            # get non-nan data shared between each used axis as a numpy array
+            x, y, c, indices = self.shared_indices(self.cat.ra[name2],
+                                                   yaxis=self.cat.dec[name2], caxis=logRatio)
 
             # format labels according to destination of figure
             if self.plot_to == 'html':
@@ -1683,10 +1684,10 @@ class report(object):
 
             # derive the statistics of x and store in string
             alpha_med, alpha_mean, alpha_std, alpha_err, alpha_mad = get_stats(x)
-            txt = r'\widetilde{\\alpha}$: %.2f\n' % alpha_med
-            txt += r'\overline{\\alpha}$: %.2f\n' % alpha_mean
-            txt += r'\sigma_{\\alpha}$: %.2f\n' % alpha_std
-            txt += r'\sigma_{\overline{\\alpha}}$: %.2f' % alpha_err
+            txt = r'$\widetilde{\\alpha}$: %.2f' % alpha_med + '\n'
+            txt += r'$\overline{\\alpha}$: %.2f' % alpha_mean + '\n'
+            txt += r'$\sigma_{\\alpha}$: %.2f' % alpha_std + '\n'
+            txt += r'$\sigma_{\overline{\\alpha}}$: %.2f' % alpha_err
 
             # write the ratio to html report table
             self.html.write("""</td>
