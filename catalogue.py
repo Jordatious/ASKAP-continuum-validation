@@ -363,7 +363,7 @@ class catalogue(object):
             self.img_peak_rms = rms_map.data[self.img_peak_pos][0]
             self.dynamic_range = self.img_peak_bounds/self.img_peak_rms
             self.img_flux = np.sum(img_data[~np.isnan(img_data)]) / \
-             (1.133 * ((img.bmaj * img.bmin) / (img.raPS * img.decPS)))
+                (1.133 * ((img.bmaj * img.bmin) / (img.raPS * img.decPS)))
 
         # Get the approximate area from catalogue
         else:
@@ -477,8 +477,8 @@ class catalogue(object):
                 self.rms[cat.name] = cat.rms[cat.name]
 
                 # write flux ratio if frequencies within 1%
-                if self.name in list(self.flux.keys()) and\
-                 np.abs(cat.freq[cat.name]/self.freq[self.name]-1) < 0.01:
+                freq_ratio = np.abs(cat.freq[cat.name]/self.freq[self.name]-1)
+                if self.name in list(self.flux.keys()) and freq_ratio < 0.01:
                     self.df[prefix + 'flux_ratio'] = self.flux[self.name]/self.flux[cat.name]
 
             if cat.si_col is not None:
@@ -665,7 +665,7 @@ class catalogue(object):
             DEC = self.df[self.dec_col]
 
         if (type(ra) is tuple and (type(dec) is not tuple or len(ra) != 2)) or\
-         (type(dec) is tuple and (type(ra) is not tuple or len(dec) != 2)):
+                (type(dec) is tuple and (type(ra) is not tuple or len(dec) != 2)):
             warnings.warn_explicit('RA and DEC must both be single value or a\
             tuple with two indices. Cutout not applied.\n', UserWarning,
                                    WARN, cf.f_lineno)
@@ -807,8 +807,8 @@ class catalogue(object):
                         self.peak_err_col]**2)
                     if self.finder == 'selavy':
                         uncertainty += np.sqrt(self.df[self.rms_val]**2)
-                    resolved = self.df[self.flux_col] - self.df[self.peak_col]\
-                    > ratio_sigma * uncertainty
+                    diff = self.df[self.flux_col] - self.df[self.peak_col]
+                    resolved = diff > ratio_sigma * uncertainty
                     self.df = self.df[~resolved]
                     if verbose:
                         print("Rejected (resolved) sources according to int/peak metric,\
@@ -1100,7 +1100,7 @@ class catalogue(object):
             # don't derive spectral indices if there aren't 2+ catalogues to use,
             # but just derive flux at given frequency from a typical spectral index
             if (num_cats <= 1 or not fit_flux) and self.name in self.flux and\
-            (redo or best_fitted_flux not in self.df.columns):
+                    (redo or best_fitted_flux not in self.df.columns):
                 self.est_fitted_flux(best_fitted_flux, best_fitted_ratio, freq, max_cat)
 
             # otherwise, derive the spectral index and fitted flux using all available frequencies

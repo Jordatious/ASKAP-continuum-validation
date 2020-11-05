@@ -5,7 +5,7 @@ from datetime import datetime
 from inspect import currentframe, getframeinfo
 
 import matplotlib.image as image
-import matplotlib.pyplot as plt, mpld3
+import matplotlib.pyplot as plt, mpld3  # noqa: E401
 import numpy as np
 import pandas as pd
 from astropy.coordinates import SkyCoord
@@ -1269,8 +1269,7 @@ class report(object):
 
                     for func in line_funcs:
                         xline, yline = func(xlin, ylin)
-                        line = plt.plot(xline, yline, lw=2, color='black', linestyle='-',
-                                        zorder=12)
+                        plt.plot(xline, yline, lw=2, color='black', linestyle='-', zorder=12)
 
                 # doing this here forces the lines in html plots to not increase the axis limits
                 if reverse_x:
