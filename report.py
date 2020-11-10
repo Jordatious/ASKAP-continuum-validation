@@ -898,9 +898,9 @@ class report(object):
         line, = plt.plot(xlin, ylin, c='black', linestyle='--', zorder=5)
         txt = ''
         if self.plot_to == 'html':
-            txt += 'Data from <a href="http://adsabs.harvard.edu/abs/2011PASA...28..215N">'
+            txt += 'Data from <a href="http://adsabs.harvard.edu/abs/2011PASA...28..215N">'\
             'Norris+11</a>'
-            txt += ' (updated from <a href="http://adsabs.harvard.edu/abs/2003AJ....125..465H"'
+            txt += ' (updated from <a href="http://adsabs.harvard.edu/abs/2003AJ....125..465H"'\
             '>Hopkins+03</a>)\n'
         txt += r'$\chi^2_{red}$: %.2f' % red_chi_sq
 
@@ -1683,9 +1683,9 @@ class report(object):
 
             # derive the statistics of x and store in string
             alpha_med, alpha_mean, alpha_std, alpha_err, alpha_mad = get_stats(x)
-            txt = r'$\widetilde{\\alpha}$: %.2f' % alpha_med + '\n'
-            txt += r'$\overline{\\alpha}$: %.2f' % alpha_mean + '\n'
-            txt += r'$\sigma_{\\alpha}$: %.2f' % alpha_std + '\n'
+            txt = r'$\widetilde{\alpha}$: %.2f' % alpha_med + '\n'
+            txt += r'$\overline{\alpha}$: %.2f' % alpha_mean + '\n'
+            txt += r'$\sigma_{\alpha}$: %.2f' % alpha_std + '\n'
             txt += r'$\sigma_{\overline{\\alpha}}$: %.2f' % alpha_err
 
             # write the ratio to html report table

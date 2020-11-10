@@ -160,7 +160,8 @@ class catalogue(object):
         # column names when not already done
         if not fileFound:
             self.df.columns = '{0}_'.format(self.name) + self.df.columns
-
+            
+        self.col_suffix = col_suffix
         if finder is None:
             self.finder = None
         else:
@@ -283,7 +284,7 @@ class catalogue(object):
         col : string
             Unique column name or None."""
         if col is not None:
-            col = '{0}_{1}{2}'.format(self.name, col, '')
+            col = '{0}_{1}{2}'.format(self.name,col,self.col_suffix)
         return col
 
     def cat2df(self, filepath, sep, verbose=False):
