@@ -1686,7 +1686,7 @@ class report(object):
             txt = r'$\widetilde{\alpha}$: %.2f' % alpha_med + '\n'
             txt += r'$\overline{\alpha}$: %.2f' % alpha_mean + '\n'
             txt += r'$\sigma_{\alpha}$: %.2f' % alpha_std + '\n'
-            txt += r'$\sigma_{\overline{\\alpha}}$: %.2f' % alpha_err
+            txt += r'$\sigma_{\overline{\alpha}}$: %.2f' % alpha_err
 
             # write the ratio to html report table
             self.html.write("""</td>
