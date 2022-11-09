@@ -3,7 +3,7 @@
 """Input an ASKAP continuum image and produce a validation report (in html) in a directory named after the image, which summarises
 several validation tests/metrics (e.g. astrometry, flux scale, source counts, etc) and whether the data passed or failed these tests.
 
-Last updated: 12/06/2018
+Last updated: 09/11/2022
 
 Usage:
   ASKAP_continuum_validation.py -h | --help
@@ -19,7 +19,7 @@ Options:
   -S --Selavy=<cat>         Use this Selavy catalogue of the input ASKAP image. Default is to run Aegean [default: None].
   -N --noise=<map>          Use this fits image of the local rms. Default is to run BANE [default: None].
   -C --catalogues=<list>    A comma-separated list of filepaths to catalogue config files corresponding to catalogues to use
-                            (will look in --main-dir for each file not found in given path) [default: NVSS_config.txt,SUMSS_config.txt].
+                            (will look in --main-dir for each file not found in given path) [default: RACS-low_config.txt].
   -F --filter=<config>      A config file for filtering the sources in the ASKAP catalogue [default: None].
   -R --snr=<ratio>          The signal-to-noise ratio cut to apply to the ASKAP catalogue and the source counts (doesn't affect source finding) [default: 5.0].
   -v --verbose              Verbose output [default: False].
@@ -37,7 +37,7 @@ Options:
   -s --source=<src>         The format for writing plots (e.g. screen, html, eps, pdf, png, etc) [default: html].
   -a --aegean=<params>      A single string with extra paramters to pass into Aegean (except cores, noise, background, and table) [default: --floodclip=3]."""
 
-from __future__ import division
+
 from docopt import docopt
 import os
 import sys
@@ -70,13 +70,13 @@ from report import report
 
 #find directory that contains all the necessary files
 main_dir = args['--main-dir']
-if main_dir.startswith('$ACES') and 'ACES' in os.environ.keys():
+if main_dir.startswith('$ACES') and 'ACES' in list(os.environ.keys()):
     ACES = os.environ['ACES']
     main_dir = main_dir.replace('$ACES',ACES)
 if not os.path.exists('{0}/requirements.txt'.format(main_dir)):
     split = sys.argv[0].split('/')
     script_dir = '/'.join(split[:-1])
-    print "Looking in '{0}' for necessary files.".format(script_dir)
+    print("Looking in '{0}' for necessary files.".format(script_dir))
     if 'ASKAP_continuum_validation' in split[-1]:
         main_dir = script_dir
     else:
@@ -151,25 +151,25 @@ if __name__ == "__main__":
     #catalogue further so specs and source counts can be written for all sources above input SNR
     AKcat.filter_sources(SNR=snr,flags=True,redo=redo,write=write_any,verbose=verbose,file_suffix='_snr{0}'.format(snr))
     AKcat.set_specs(AK)
-    AKreport = report(AKcat,main_dir,img=AK,verbose=verbose,plot_to=source,redo=redo,src_cnt_bins=nbins,write=write_any)
+    AKreport = report(AKcat,main_dir,img=AK,verbose=verbose,plot_to=source,redo=redo,src_cnt_bins=nbins,write=write_any,do_source_counts=True,rms_map=noise)
 
     #use config file for filtering sources if it exists
     if filter_config is not None:
         if verbose:
-            print "Using config file '{0}' for filtering.".format(filter_config)
+            print("Using config file '{0}' for filtering.".format(filter_config))
         filter_dic = config2dic(filter_config,main_dir,verbose=verbose)
         filter_dic.update({'redo' : redo, 'write' : write_all, 'verbose' : verbose})
         AKcat.filter_sources(**filter_dic)
     else:
-        #otherwise use default criteria, selecting reliable point sources for comparison
-        AKcat.filter_sources(flux_lim=1e-3,ratio_frac=0,ratio_sigma=3,reject_blends=True,flags=True,psf_tol=1.5,resid_tol=3,
+        #otherwise use default criteria, selecting reliable (e.g. point) sources for comparison
+        AKcat.filter_sources(flux_lim=0.1e-3,ratio_frac=0,ratio_sigma=0,reject_blends=True,flags=True,psf_tol=0,resid_tol=0,
                             redo=redo,write=write_all,verbose=verbose)
 
     #process each catalogue object according to list of input catalogue config files
     #this will cut out a box, cross-match to this instance, and derive the spectral indices.
     for config_file in config_files:
         if verbose:
-            print "Using config file '{0}' for catalogue.".format(config_file)
+            print("Using config file '{0}' for catalogue.".format(config_file))
         config_file = config_file.strip() #in case user put a space
         config_file = find_file(config_file,main_dir,verbose=verbose)
         AKcat.process_config_file(config_file,main_dir,redo=redo,verbose=verbose,write_all=write_all,write_any=write_any)
@@ -179,13 +179,13 @@ if __name__ == "__main__":
     if len(AKcat.cat_list) > 1:
         AKcat.fit_spectra(redo=redo,models=SEDs,GLEAM_subbands='int',GLEAM_nchans=4,cat_name=None,write=write_any,fit_flux=fit_flux,fig_extn=SEDextn)
 
-    print "----------------------------"
-    print "| Running validation tests |"
-    print "----------------------------"
+    print("----------------------------")
+    print("| Running validation tests |")
+    print("----------------------------")
 
     #Produce validation report for each cross-matched catalogue
     for cat_name in AKcat.cat_list[1:]:
-        AKreport.validate(AKcat.name,cat_name,redo=redo)
+        AKreport.validate(AKcat.name,cat_name,redo=redo,fit_flux=fit_flux)
 
     #write file with RA/DEC offsets for ASKAPsoft pipeline
     #and append validation metrics to html file and then close it

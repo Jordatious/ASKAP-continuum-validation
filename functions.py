@@ -1,4 +1,4 @@
-from __future__ import division
+
 import os
 import numpy as np
 import scipy.optimize as opt
@@ -31,12 +31,12 @@ def changeDir(filepath,suffix,verbose=False):
     #create it if it doesn't exist
     if not os.path.exists(dir):
         if verbose:
-            print "Making directory for output files - {0}.".format(dir)
+            print("Making directory for output files - {0}.".format(dir))
         os.mkdir(dir)
 
     #move to that directory and update the filepath
     if verbose:
-        print "Changing to directory for output files - '{0}'.".format(dir)
+        print("Changing to directory for output files - '{0}'.".format(dir))
     os.chdir(dir)
 
 ###The following are radio SED models as a function of frequency and several fitted parmaters###
@@ -173,7 +173,7 @@ def sig_figs(value, n=2):
     return ("{0:.%d}" % (n)).format(value)
 
 
-def plot_spectra(freqs, fluxes, errs, models, names, params, param_errs, rcs, BICs, colours, labels, figname, annotate=True, model_selection='better'):
+def plot_spectra(freqs, fluxes, errs, models, names, params, param_errs, rcs, BICs, colours, labels, figname, figure=None, annotate=True, model_selection='better'):
 
     """Plot a figure of the radio spectra of an individual source, according to the input data and models.
 
@@ -206,6 +206,8 @@ def plot_spectra(freqs, fluxes, errs, models, names, params, param_errs, rcs, BI
 
     Keyword arguments:
     ------------------
+    figure : matplotlib.pyplot.figure
+        Figure object to start with.
     annotate : bool
         Annotate fit info onto figure.
     model_selection : string
@@ -221,8 +223,14 @@ def plot_spectra(freqs, fluxes, errs, models, names, params, param_errs, rcs, BI
     if not os.path.exists('SEDs'):
         os.mkdir('SEDs')
 
-    fig=plt.figure()
-    ax=plt.subplot()
+    if figure is None:
+        fig=plt.figure()
+        ax=plt.subplot()
+        offset = 0
+    else:
+        fig = figure
+        ax=plt.gca()
+        offset = 0.33
 
     #plot frequency axis 20% beyond range of values
     xlin = np.linspace(min(freqs)*0.8,max(freqs)*1.2,num=5000)
@@ -246,7 +254,6 @@ def plot_spectra(freqs, fluxes, errs, models, names, params, param_errs, rcs, BI
 
     best_bic = 0
     dBIC = 3
-    offset = 0
     plotted_models = 0
 
     #plot each model
@@ -304,12 +311,16 @@ def plot_spectra(freqs, fluxes, errs, models, names, params, param_errs, rcs, BI
 
             #annotate all fit info if it will fit on figure
             if annotate and plotted_models <= 3:
-                plt.text(offset,0,txt,horizontalalignment='left',verticalalignment='bottom',transform=ax.transAxes)
+                plt.text(offset,0,txt,horizontalalignment='left',verticalalignment='bottom',transform=ax.transAxes,size=10)
                 offset += 0.33
 
     #write figure and close
-    plt.savefig('SEDs/{0}'.format(figname))
-    plt.close()
+    if figure is not None:
+        plt.savefig('SEDs/{0}'.format(figname))
+        plt.close()
+        fig = None
+
+    return fig
 
 def likelihood(ydata,ymodel,yerrs):
 
@@ -355,7 +366,10 @@ def fit_info(ydata,ymodel,yerrs,deg):
 
     chi_sq=np.sum(((ydata-ymodel)/yerrs)**2)
     DOF=len(ydata)-deg
-    red_chi_sq = chi_sq/DOF
+    if DOF > 0:
+        red_chi_sq = chi_sq/DOF
+    else:
+        red_chi_sq = np.inf
     BIC = -2*np.log(likelihood(ydata,ymodel,yerrs)) + deg * np.log(len(ydata))
     return red_chi_sq,BIC
 
@@ -389,7 +403,7 @@ def two_freq_power_law(freq, freqs, fluxes, errs):
     flux = flux_at_freq(freq,freqs[0],fluxes[0],alpha)
     return alpha,alpha_err,flux
 
-def SED(freq, freqs, fluxes, errs, models='pow', figname=None):
+def SED(freq, freqs, fluxes, errs, models='pow', figname=None, figure=None, DOF=1):
 
     """Fit SED models to an individual source and return the model params and errors along with the expected flux at a given frequency, for each input model.
     Lists must be the same length and contain at least two elements, all with the same units (ideally MHz and Jy).
@@ -404,6 +418,8 @@ def SED(freq, freqs, fluxes, errs, models='pow', figname=None):
         A list of fluxes in the same units.
     errs : list
         A list of flux uncertainties in the same units.
+    DOF : int
+        Degrees of freedom needed to include a model.
 
     Keyword arguments:
     ------------------
@@ -439,6 +455,7 @@ def SED(freq, freqs, fluxes, errs, models='pow', figname=None):
 
     #initial guesses of different models
     params = { 'pow' : [S_max,alpha],
+            'pow2' : [S_max,alpha],
             'powcibreak' : [S_max, alpha, nu_br],
             'powjpbreak' : [S_max, alpha, nu_br],
             'curve' : [S_max, nu_max, 1, alpha],
@@ -452,6 +469,7 @@ def SED(freq, freqs, fluxes, errs, models='pow', figname=None):
 
     #different SED models from functions above
     funcs = {   'pow' : powlaw,
+                'pow2' : powlaw,
                 'powcibreak' : pow_CIbreak,
                 'powjpbreak' : pow_JPbreak,
                 'curve' : curve,
@@ -465,19 +483,21 @@ def SED(freq, freqs, fluxes, errs, models='pow', figname=None):
 
     #matplotlib colours
     colours = { 'pow' : 'black',
+            'pow2' : 'black',
             'powcibreak' : 'b',
-            'powjpbreak' : 'violet',
+            'powjpbreak' : 'orange',
             'curve' : 'r',
             'ssa' : 'g',
             'ssacibreak' : 'r',
             'ssajpbreak' : 'g',
-            'ffa' : 'orange',
+            'ffa' : 'violet',
             'bicffa' : 'r',
             'bicffacibreak' : 'b',
             'bicffajpbreak' : 'r'}
 
     #labels
     labels = {  'pow' : 'Power law',
+                'pow2' : 'Power law',
                 'powcibreak' : 'Power law\n + CI break',
                 'powjpbreak' : 'Power law\n + JP break',
                 'curve' : 'Tschager+03 Curve',
@@ -499,8 +519,8 @@ def SED(freq, freqs, fluxes, errs, models='pow', figname=None):
     for model in models:
         model = model.lower()
 
-        #fit model if DOF >= 1
-        if len(freqs) >= len(params[model])+1:
+        #fit model if >= DOF
+        if len(freqs) >= len(params[model])+DOF:
             try:
                 #perform a least squares fit
                 popt, pcov = opt.curve_fit(funcs[model], freqs, fluxes, p0 = params[model], sigma = errs, maxfev = 10000)
@@ -513,21 +533,21 @@ def SED(freq, freqs, fluxes, errs, models='pow', figname=None):
                 rcs.append(RCS)
                 BICs = np.append(BICs,bic)
                 fitted_fluxes.append(funcs[model](freq,*popt))
-            except (ValueError,RuntimeError),e:
-                print "Couldn't find good fit for {0} model.".format(model)
-                print e
+            except (ValueError,RuntimeError) as e:
+                print("Couldn't find good fit for {0} model.".format(model))
+                print(e)
 
     #get lists of names, functions, colours and labels for all used models
-    names = [funcs[model].func_code.co_varnames[1:funcs[model].func_code.co_argcount] for model in fit_models]
+    names = [funcs[model].__code__.co_varnames[1:funcs[model].__code__.co_argcount] for model in fit_models]
     funcs = [funcs[model] for model in fit_models]
     colours = [colours[model] for model in fit_models]
     labels = [labels[model] for model in fit_models]
 
     #write figure for this source
     if figname is not None and len(fit_models) > 0:
-        plot_spectra(freqs,fluxes,errs,funcs,names,fit_params,fit_param_errors,rcs,BICs,colours,labels,figname,model_selection='all')
+        figure = plot_spectra(freqs,fluxes,errs,funcs,names,fit_params,fit_param_errors,rcs,BICs,colours,labels,figname,figure=figure,model_selection='all')
 
-    return fit_models,names,fit_params,fit_param_errors,fitted_fluxes,rcs,BICs
+    return fit_models,names,fit_params,fit_param_errors,fitted_fluxes,rcs,BICs,figure
 
 
 def get_pixel_area(fits,flux=0,nans=False,ra_axis=0,dec_axis=1,w=None):
@@ -569,10 +589,10 @@ def get_pixel_area(fits,flux=0,nans=False,ra_axis=0,dec_axis=1,w=None):
         w = WCS(fits.header)
 
     #count the pixels and derive area and solid angle of all these pixels
-    if nans:
-        count = fits.data[(~np.isnan(fits.data)) & (fits.data != 0)].shape[0]
-    else:
-        count = fits.data[(fits.data < flux) & (fits.data != 0)].shape[0]
+    mask = (~np.isnan(fits.data)) & (fits.data != 0)
+    if not nans:
+        mask = mask & (fits.data < flux)
+    count = fits.data[mask].size
 
     area = (count*np.abs(w.wcs.cdelt[ra_axis])*np.abs(w.wcs.cdelt[dec_axis]))
     solid_ang = area*(np.pi/180)**2
@@ -783,11 +803,10 @@ def find_file(filepath,main_dir,verbose=True):
         #look in main directory if file doesn't exist in relative filepath
         if os.path.exists('{0}/{1}'.format(main_dir,filepath)):
             if verbose:
-                print "Looking in '{0}' for '{1}'.".format(main_dir,filepath)
+                print("Looking in '{0}' for '{1}'.".format(main_dir,filepath))
             filepath = '{0}/{1}'.format(main_dir,filepath)
         #update directory path if file is relative path
         else:
             filepath = new_path(filepath)
 
     return filepath
-

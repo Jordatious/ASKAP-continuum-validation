@@ -1,4 +1,4 @@
-from __future__ import division
+
 from functions import *
 import os
 import glob
@@ -45,7 +45,7 @@ class catalogue(object):
         search_rad : float
             The search radius in arcsec to use when cross-matching this catalogue.
         finder : string
-            The source finder that produced this catalogue (if known) ['Aegean' | 'Selavy' | 'pybdsm'].
+            The source finder that produced this catalogue (if known) ['Aegean' | 'Selavy' | 'pybdsf'].
             This sets all the column names (including rms) and flux units to their defaults for that source finder.
         ra_col : string
             The name of the RA column.
@@ -93,9 +93,9 @@ class catalogue(object):
         astropy.coordinates.SkyCoord
         pandas.DataFrame"""
 
-        print "--------------------------"
-        print "| Reading {0} catalogue |".format(name)
-        print "--------------------------"
+        print("--------------------------")
+        print("| Reading {0} catalogue |".format(name))
+        print("--------------------------")
 
         self.verbose = verbose
         self.name = name
@@ -122,13 +122,13 @@ class catalogue(object):
             fileFound = True
             if os.path.exists(self.si_name):
                 filename = self.si_name
-                print "Spectral index catalogue already exists. Using file '{0}'".format(filename)
+                print("Spectral index catalogue already exists. Using file '{0}'".format(filename))
             elif os.path.exists(self.filtered_name):
                 filename = self.filtered_name
-                print "Filtered catalogue already exists. Using file '{0}'".format(filename)
+                print("Filtered catalogue already exists. Using file '{0}'".format(filename))
             elif os.path.exists(self.cutout_name):
                 filename = self.cutout_name
-                print "Cutout catalogue already exists. Using file '{0}'".format(filename)
+                print("Cutout catalogue already exists. Using file '{0}'".format(filename))
             else:
                 fileFound = False
 
@@ -136,9 +136,9 @@ class catalogue(object):
         self.df = self.cat2df(filename,sep,verbose=True)
 
         #Read frequency and search radius from image object if exists, otherwise from input paramaters
-        if self.image is not None:
+        if self.image is not None and self.image.freq != -1:
             self.frequency=self.image.freq
-            self.search_rad=3*self.image.posErr
+            self.search_rad=self.image.posErr #*3 (uncomment for 3 sigma)
         else:
             self.frequency = frequency
             self.search_rad = search_rad
@@ -152,14 +152,14 @@ class catalogue(object):
             self.finder = None
         else:
             self.finder = finder.lower()
-        self.knownFinder = (self.finder in ['aegean','selavy','pybdsm'])
+        self.knownFinder = (self.finder in ['aegean','selavy','pybdsf','profound'])
 
         if self.finder is not None and not self.knownFinder:
-            warnings.warn_explicit("Unrecognised source finder: {0}. Use 'Aegean', 'Selavy' or 'pybdsm'\n".format(finder),UserWarning,WARN,cf.f_lineno)
+            warnings.warn_explicit("Unrecognised source finder: {0}. Use 'Aegean', 'Selavy', 'ProFound', or 'PyBDSF'\n".format(finder),UserWarning,WARN,cf.f_lineno)
 
         if self.finder is not None and self.finder == 'selavy':
             if self.verbose:
-                print 'Using default configuration for Selavy.'
+                print('Using default configuration for Selavy.')
 
             #set default column names for Selavy, appending catalogue name to beginning
             self.flux_col=self.unique_col_name('flux_int')
@@ -177,30 +177,37 @@ class catalogue(object):
             self.flux_unit='mjy'
             self.si_col=self.unique_col_name('spectral_index')
 
-        elif self.finder is not None and self.finder == 'pybdsm':
+        elif self.finder is not None and self.finder in ['pybdsf','profound']:
             if self.verbose:
-                print 'Using default configuration for pybdsm.'
+                print('Using default configuration for {0}.'.format(self.finder))
 
-            #set default column names for pybdsm, appending catalogue name to beginning
+            #set default column names for pybdsf, appending catalogue name to beginning
             self.flux_col=self.unique_col_name('Total_flux')
             self.flux_err_col=self.unique_col_name('E_Total_flux')
             self.peak_col=self.unique_col_name('Peak_flux')
             self.peak_err_col=self.unique_col_name('E_Peak_flux')
-            self.rms_val=self.unique_col_name('Isl_rms')
-            self.island_col=self.unique_col_name('Isl_id')
-            self.flag_col=None
-            self.maj_col=self.unique_col_name('DC_Maj')
             self.ra_col=self.unique_col_name('RA')
             self.dec_col=self.unique_col_name('DEC')
             self.ra_fmt='deg'
             self.dec_fmt='deg'
-            self.flux_unit='jy'
             self.si_col=None
+            self.flag_col=None
 
+            if self.finder == 'profound':
+                self.rms_val=self.unique_col_name('rms_mean')
+                self.island_col=self.unique_col_name('IAU_Source_ID')
+                self.maj_col=self.unique_col_name('Maj')
+                self.si_col=self.unique_col_name('alpha')
+                self.flux_unit='mjy'
+            else:
+                self.rms_val=self.unique_col_name('Isl_rms')
+                self.island_col=self.unique_col_name('Isl_id') #TODO: allow config to overload this (e.g. Source_Name)
+                self.maj_col=self.unique_col_name('DC_Maj')
+                self.flux_unit='jy'
         else:
             if self.finder is not None and self.finder == 'aegean':
                 if self.verbose:
-                    print 'Using default configuration for Aegean.'
+                    print('Using default configuration for Aegean.')
 
             #append catalogue name to beginning of all columns
             self.flux_col=self.unique_col_name(flux_col)
@@ -216,7 +223,8 @@ class catalogue(object):
                 self.rms_val = rms_val
 
             #specific fix for GLEAM catalogue
-            if finder is not None and finder.lower() == 'aegean':
+            if finder is not None and finder.lower() == 'aegean' and self.col_suffix == '_wide':
+                self.island_col=self.unique_col_name('Name')
                 self.col_suffix = ''
             self.flux_unit = flux_unit
 
@@ -227,8 +235,8 @@ class catalogue(object):
             self.si_col=None
 
         self.use_peak = use_peak
-
         self.flux_unit = self.flux_unit.lower()
+
         if self.flux_unit not in ('jy','mjy','ujy'):
             warnings.warn_explicit("Unrecognised flux unit '{0}'. Use 'Jy', 'mJy' or 'uJy'. Assuming 'Jy'\n".format(flux_unit),UserWarning,WARN,cf.f_lineno)
             self.flux_unit = 'jy'
@@ -298,24 +306,24 @@ class catalogue(object):
         pandas.DataFrame"""
 
         if verbose:
-            print "Loading '{0}' catalogue into pandas.".format(filepath.split('/')[-1])
+            print("Loading '{0}' catalogue into pandas.".format(filepath.split('/')[-1]))
 
         #convert from fits or xml to dataframe
         extn = filepath.split('.')[-1].lower()
         if extn == 'fits' or extn == 'gz':
             table = f.open(filepath)[1]
             df = Table(data=table.data).to_pandas()
-        elif extn == 'xml': #assumed to come from Selavy
+        elif extn in ['xml','votable']: #assumed to come from Selavy
             table = parse_single_table(filepath).to_table(use_names_over_ids=True)
             df = table.to_pandas()
         #otherwise, load straight into pandas as csv or 'sep' delimited file
         elif extn == 'csv':
             df = pd.read_csv(filepath)
         else:
-            df = pd.read_table(filepath,sep=sep)
+            df = pd.read_table(filepath,sep=sep)#,header=4)
 
         if verbose:
-            print "Catalogue contains {0} sources.".format(len(df))
+            print("Catalogue contains {0} sources.".format(len(df)))
 
         return df
 
@@ -334,9 +342,8 @@ class catalogue(object):
 
             #Get dynamic range between image and rms map and sum of image flux vs. total catalogue flux
             rms_map = f.open(img.rms_map)[0]
-            img_data = img.fits.data
-            if self.finder == 'aegean':
-                img_data = img_data[0][0]
+            rms_map.data = np.squeeze(rms_map.data)
+            img_data = np.squeeze(img.fits.data)
             self.img_peak = np.max(img_data[~np.isnan(img_data)])
             self.rms_bounds = rms_map.data > 0
             self.img_rms = int(np.median(rms_map.data[self.rms_bounds])*1e6) #uJy
@@ -344,11 +351,12 @@ class catalogue(object):
             self.img_peak_pos = np.where(img_data == self.img_peak_bounds)
             self.img_peak_rms = rms_map.data[self.img_peak_pos][0]
             self.dynamic_range = self.img_peak_bounds/self.img_peak_rms
-            self.img_flux = np.sum(img_data[~np.isnan(img_data)]) / (1.133*((img.bmaj * img.bmin) / (img.raPS * img.decPS))) #divide by beam area
+            mask = ~np.isnan(img_data) #img_data > 0.0
+            self.img_flux = np.sum(img_data[mask]) / (1.133*((img.bmaj * img.bmin) / (img.raPS * img.decPS))) #divide by beam area
 
         #Get the approximate area from catalogue
         else:
-            if self.name not in self.coords.keys():
+            if self.name not in list(self.coords.keys()):
                 self.set_key_fields()
             self.ra_bounds = (max(self.ra[self.name]),min(self.ra[self.name]))
             dRA = (self.ra_bounds[0] - self.ra_bounds[1])*np.cos(np.deg2rad(np.mean(self.dec[self.name])))
@@ -361,28 +369,28 @@ class catalogue(object):
             self.img_flux = np.nan
 
         self.blends = len(np.where(self.df[self.island_col].value_counts() > 1)[0])
-        self.cat_flux = np.sum(self.flux[self.name])
+        self.cat_flux = np.sum(self.df[self.flux_col]*self.factor)
 
         #get median spectral index if column exists
-        if self.name in self.si.keys():
+        if self.name in list(self.si.keys()):
             self.med_si = np.median(self.si[self.name])
         else:
             self.med_si = -99
 
         if self.verbose:
-            print "Sum of flux in image is {0:.3f} Jy and sum of all fitted gaussians is {1:.3f} Jy.".format(self.img_flux,self.cat_flux)
-            print "Image peak is {0:.2f} Jy.".format(self.img_peak)
-            print "Dynamic range is {0:.0E}.".format(self.dynamic_range)
-            print "Number of multi-component islands is {0}.".format(self.blends)
+            print("Sum of flux in image is {0:.3f} Jy and sum of all fitted gaussians is {1:.3f} Jy.".format(self.img_flux,self.cat_flux))
+            print("Image peak is {0:.2f} Jy.".format(self.img_peak))
+            print("Dynamic range is {0:.0E}.".format(self.dynamic_range))
+            print("Number of multi-component islands is {0}.".format(self.blends))
             if self.med_si != -99:
-                print "Median spectral index is {0:.2f}.".format(self.med_si)
+                print("Median spectral index is {0:.2f}.".format(self.med_si))
 
 
         #Store the initial length of the catalogue
         self.initial_count = self.count[self.name]
 
         #Derive the fraction of resolved sources as the fraction of sources with int flux > 3-sigma away from peak flux
-        if self.name in self.flux.keys():
+        if self.name in list(self.flux.keys()):
             #Josh's method
             self.uncertainty = np.sqrt(self.df[self.flux_err_col]**2 + self.df[self.peak_err_col]**2)
             if self.finder == 'selavy':
@@ -452,13 +460,13 @@ class catalogue(object):
             self.dRA[cat.name] = self.df[dRA]
             self.dDEC[cat.name] = self.df[dDEC]
 
-            if cat.name in cat.flux.keys():
+            if cat.name in list(cat.flux.keys()):
                 self.flux[cat.name] = cat.flux[cat.name]
                 self.flux_err[cat.name] = cat.flux_err[cat.name]
                 self.rms[cat.name] = cat.rms[cat.name]
 
                 #write flux ratio if frequencies within 1%
-                if self.name in self.flux.keys() and np.abs(cat.freq[cat.name]/self.freq[self.name]-1) < 0.01:
+                if self.name in list(self.flux.keys()) and np.abs(cat.freq[cat.name]/self.freq[self.name]-1) < 0.01:
                     self.df[prefix + 'flux_ratio'] = self.flux[self.name]/self.flux[cat.name]
 
             if cat.si_col != None:
@@ -506,14 +514,14 @@ class catalogue(object):
                     self.rms[self.name] = self.rms_val
 
                 #Force Jy units
-                factor = 1
+                self.factor = 1
                 if self.flux_unit == 'mjy':
-                    factor = 1e-3
+                    self.factor = 1e-3
                 elif self.flux_unit == 'ujy':
-                    factor = 1e-6
-                self.flux[self.name] *= factor
-                self.flux_err[self.name] *= factor
-                self.rms[self.name] *= factor
+                    self.factor = 1e-6
+                self.flux[self.name] *= self.factor
+                self.flux_err[self.name] *= self.factor
+                self.rms[self.name] *= self.factor
 
                 if self.si_col != None:
                     self.si[self.name] = self.df[self.si_col]
@@ -526,20 +534,20 @@ class catalogue(object):
                     self.dec[self.name] = self.dec[self.name][indices]
 
                 #reset indices of pandas series
-                if self.name in self.flux.keys():
+                if self.name in list(self.flux.keys()):
                     self.flux[self.name] = self.flux[self.name][indices].reset_index(drop=True)
                     self.flux_err[self.name] = self.flux_err[self.name][indices].reset_index(drop=True)
                     if type(self.rms_val) is str:
                         self.rms[self.name] = self.rms[self.name][indices].reset_index(drop=True)
 
                 #only update these for cross-matched catalogues
-                if self.name in self.sep.keys():
+                if self.name in list(self.sep.keys()):
                     self.sep[self.name] = self.sep[self.name][indices].reset_index(drop=True)
                     self.dRAsec[self.name] = self.dRAsec[self.name][indices].reset_index(drop=True)
                     self.dRA[self.name] = self.dRA[self.name][indices].reset_index(drop=True)
                     self.dDEC[self.name] = self.dDEC[self.name][indices].reset_index(drop=True)
 
-                if self.name in self.si.keys():
+                if self.name in list(self.si.keys()):
                     self.si[self.name] = self.si[self.name][indices].reset_index(drop=True)
 
         #reset indices and catalogue length after change has been made
@@ -570,8 +578,8 @@ class catalogue(object):
             self.df = pd.read_csv(catalogue)
 
             if verbose:
-                print "'{0}' already exists. Skipping {1} step and setting catalogue to this file.".format(catalogue,step)
-                print "{0} catalogue now contains {1} sources.".format(self.name,len(self.df))
+                print("'{0}' already exists. Skipping {1} step and setting catalogue to this file.".format(catalogue,step))
+                print("{0} catalogue now contains {1} sources.".format(self.name,len(self.df)))
 
         else:
             self.df = catalogue
@@ -597,7 +605,7 @@ class catalogue(object):
 
         if write:
             if verbose:
-                print "Writing to '{0}'.".format(filename)
+                print("Writing to '{0}'.".format(filename))
             self.df.to_csv(filename,index=False)
 
     def cutout_box(self,ra,dec,fov=10,redo=False,write=True,verbose=True):
@@ -643,28 +651,28 @@ class catalogue(object):
         elif redo or not os.path.exists(filename):
             if verbose:
                 if redo:
-                    print "Re-doing cutout step."
+                    print("Re-doing cutout step.")
                     if write:
-                        print "Overwriting '{0}'.".format(filename)
-                print "Cutting out sources from {0}.".format(self.name)
+                        print("Overwriting '{0}'.".format(filename))
+                print("Cutting out sources from {0}.".format(self.name))
 
             #cut out all rows outside RA and DEC boundaries
             if type(ra) is tuple:
                 ra_min,ra_max,dec_min,dec_max = axis_lim(ra,min),axis_lim(ra,max),axis_lim(dec,min),axis_lim(dec,max)
                 if verbose:
-                    print "Selecting sources with {0} <= RA <= {1} and {2} <= DEC <= {3}.".format(ra_min,ra_max,dec_min,dec_max)
+                    print("Selecting sources with {0} <= RA <= {1} and {2} <= DEC <= {3}.".format(ra_min,ra_max,dec_min,dec_max))
                 self.df = self.df[(RA <= ra_max) & (RA >= ra_min) & (DEC <= dec_max) & (DEC >= dec_min)]
 
             #cut out all rows outside the FOV
             else:
                 if verbose:
-                    print "Using a {0}x{0} degree box centred at {1} deg, {2} deg.".format(fov,ra,dec)
+                    print("Using a {0}x{0} degree box centred at {1} deg, {2} deg.".format(fov,ra,dec))
                 self.df = self.df[(DEC <= dec + fov/2) & (DEC >= dec - fov/2) &
                                     (RA <= ra + fov/2/np.cos(np.deg2rad(DEC))) &
                                     (RA >= ra - fov/2/np.cos(np.deg2rad(DEC)))]
 
             if verbose:
-                print '{0} {1} sources within this region.'.format(len(self.df),self.name)
+                print('{0} {1} sources within this region.'.format(len(self.df),self.name))
 
             #Drop the rejected rows, reset the key fields and write to file
             self.set_key_fields(indices=self.df.index.tolist())
@@ -716,19 +724,19 @@ class catalogue(object):
         if redo or not os.path.exists(filename):
             if verbose:
                 if redo:
-                    print "Re-doing filtering."
+                    print("Re-doing filtering.")
                     if write:
-                        print "Overwriting '{0}'.".format(filename)
-                print "Filtering sources in '{0}'...".format(filename)
-                print "Initial number of sources: {0}.".format(len(self.df))
+                        print("Overwriting '{0}'.".format(filename))
+                print("Filtering sources in '{0}'...".format(filename))
+                print("Initial number of sources: {0}.".format(len(self.df)))
 
             #reject faint sources
             if flux_lim != 0:
                 if self.flux_col != None:
                     self.df = self.df[self.flux[self.name] > flux_lim]
                     if verbose:
-                        print "Rejected (faint) sources below {0} Jy.".format(flux_lim)
-                        print "Number remaining: {0}.".format(len(self.df))
+                        print("Rejected (faint) sources below {0} Jy.".format(flux_lim))
+                        print("Number remaining: {0}.".format(len(self.df)))
                 else:
                     warnings.warn_explicit("No int flux column given. Can't reject resolved sources based on flux.\n",UserWarning,WARN,cf.f_lineno)
 
@@ -739,8 +747,8 @@ class catalogue(object):
                     self.set_key_fields(indices=self.df.index.tolist())
                     self.df = self.df[self.flux[self.name] > SNR*self.rms[self.name]]
                     if verbose:
-                        print "Rejected (low-S/N) sources < {0} x r.m.s.".format(SNR)
-                        print "Number remaining: {0}.".format(len(self.df))
+                        print("Rejected (low-S/N) sources < {0} x r.m.s.".format(SNR))
+                        print("Number remaining: {0}.".format(len(self.df)))
                 else:
                     warnings.warn_explicit("rms or int flux column not given. Can't reject resolved sources based on SNR.\n",UserWarning,WARN,cf.f_lineno)
 
@@ -749,8 +757,8 @@ class catalogue(object):
                 if self.peak_col != None:
                     self.df = self.df[self.df[self.flux_col]/self.df[self.peak_col] <= ratio_frac]
                     if verbose:
-                        print "Rejected (resolved) sources with total flux > {0} times the peak flux.".format(ratio_frac)
-                        print "Number remaining: {0}.".format(len(self.df))
+                        print("Rejected (resolved) sources with total flux > {0} times the peak flux.".format(ratio_frac))
+                        print("Number remaining: {0}.".format(len(self.df)))
                 else:
                     warnings.warn_explicit("No peak flux column given. Can't reject resolved sources using flux ratio.\n",UserWarning,WARN,cf.f_lineno)
 
@@ -763,8 +771,8 @@ class catalogue(object):
                     resolved = self.df[self.flux_col] - self.df[self.peak_col] > ratio_sigma * uncertainty
                     self.df = self.df[~resolved]
                     if verbose:
-                        print "Rejected (resolved) sources according to int/peak metric, above {0} sigma.".format(ratio_sigma)
-                        print "Number remaining: {0}.".format(len(self.df))
+                        print("Rejected (resolved) sources according to int/peak metric, above {0} sigma.".format(ratio_sigma))
+                        print("Number remaining: {0}.".format(len(self.df)))
                 else:
                     warnings.warn_explicit("No peak flux column given. Can't reject resolved sources using flux ratio.\n",UserWarning,WARN,cf.f_lineno)
 
@@ -775,10 +783,10 @@ class catalogue(object):
                     point_islands = island_counts[island_counts == 1].index
                     self.df = self.df[self.df[self.island_col].isin(point_islands)]
                     if verbose:
-                        print "Rejected (resolved) sources belonging to a multi-component island."
-                        print "Number remaining: {0}.".format(len(self.df))
+                        print("Rejected (resolved) sources belonging to a multi-component island.")
+                        print("Number remaining: {0}.".format(len(self.df)))
                 else:
-                    warnings.warn_explicit("Can't reject blends since finder isn't Aegean or Selavy or pyBDSM.\n",UserWarning,WARN,cf.f_lineno)
+                    warnings.warn_explicit("Can't reject blends since finder isn't Aegean or Selavy or PyBDSF.\n",UserWarning,WARN,cf.f_lineno)
 
             #reject extended components based on component size
             if psf_tol != 0:
@@ -791,10 +799,10 @@ class catalogue(object):
                         warnings.warn_explicit("Can't rejected resolved sources based on psf tolerance without\
                         inputting radio_image object to read psf.\n",UserWarning,WARN,cf.f_lineno)
                     if verbose:
-                        print "Rejected (resolved) sources with fitted major axis > {0} times the psf major axis.".format(psf_tol)
-                        print "Number remaining: {0}.".format(len(self.df))
+                        print("Rejected (resolved) sources with fitted major axis > {0} times the psf major axis.".format(psf_tol))
+                        print("Number remaining: {0}.".format(len(self.df)))
                 else:
-                    warnings.warn_explicit("Can't reject sources based on PSF since finder isn't Aegean or Selavy or pyBDSM.\n",UserWarning,WARN,cf.f_lineno)
+                    warnings.warn_explicit("Can't reject sources based on PSF since finder isn't Aegean or Selavy or PyBDSF.\n",UserWarning,WARN,cf.f_lineno)
 
             #reject sources with poor fit
             if resid_tol != 0:
@@ -803,8 +811,8 @@ class catalogue(object):
                     self.set_key_fields(indices=self.df.index.tolist())
                     self.df = self.df[self.df['{0}_residual_std'.format(self.name)] <= resid_tol*self.rms[self.name]]
                     if verbose:
-                        print "Rejected (poorly fit) sources with standard deviation in residual > {0} times the rms.".format(resid_tol)
-                        print "Number remaining: {0}.".format(len(self.df))
+                        print("Rejected (poorly fit) sources with standard deviation in residual > {0} times the rms.".format(resid_tol))
+                        print("Number remaining: {0}.".format(len(self.df)))
                 else:
                     warnings.warn_explicit("Can't reject resolved sources based on residual since finder isn't Aegean.\n",UserWarning,WARN,cf.f_lineno)
 
@@ -813,8 +821,8 @@ class catalogue(object):
                 if self.flag_col != None:
                     self.df = self.df[self.df[self.flag_col] == 0]
                     if verbose:
-                        print "Rejecting (problematic) sources flagged as bad."
-                        print "Number remaining: {0}.".format(len(self.df))
+                        print("Rejecting (problematic) sources flagged as bad.")
+                        print("Number remaining: {0}.".format(len(self.df)))
                 else:
                     warnings.warn_explicit("Can't reject resolved sources based on flag since flag column not set.\n",UserWarning,WARN,cf.f_lineno)
 
@@ -858,18 +866,18 @@ class catalogue(object):
         if redo or not os.path.exists(filename):
             if len(self.df) == 0 or len(cat.df) == 0:
                 if self.verbose:
-                    print 'No {0} sources to match. Catalogue unchanged.'.format(cat.name)
+                    print('No {0} sources to match. Catalogue unchanged.'.format(cat.name))
                 return
 
-            print "---------------------------------"
-            print "| Cross-matching {0} and {1} |".format(self.name,cat.name)
-            print "---------------------------------"
+            print("---------------------------------")
+            print("| Cross-matching {0} and {1} |".format(self.name,cat.name))
+            print("---------------------------------")
 
             if redo:
-                print "Re-doing cross-match."
+                print("Re-doing cross-match.")
                 if write:
-                    print "Overwriting '{0}'.".format(filename)
-            print "Cross-matching {0} {1} sources with {2} {3} sources.".format(len(self.df),self.name,len(cat.df),cat.name)
+                    print("Overwriting '{0}'.".format(filename))
+            print("Cross-matching {0} {1} sources with {2} {3} sources.".format(len(self.df),self.name,len(cat.df),cat.name))
 
             #force coordinates to be set
             if len(self.coords) == 0:
@@ -887,7 +895,7 @@ class catalogue(object):
             if radius == 'largest':
                 radius = max(self.search_rad,cat.search_rad)
                 if self.verbose:
-                    print 'Using the largest of the two search radii of {0} arcsec.'.format(radius)
+                    print('Using the largest of the two search radii of {0} arcsec.'.format(radius))
 
             #only take matched rows from cat, so self.df and cat.df are parallel
             cat.df = cat.df.iloc[indices].reset_index(drop=True)
@@ -901,7 +909,7 @@ class catalogue(object):
 
             #only add cross-matched table when at least 1 match
             if len(indices) >= 1:
-                print "Found {0} matches within {1} arcsec.".format(len(indices),radius)
+                print("Found {0} matches within {1} arcsec.".format(len(indices),radius))
 
                 #don't reset indices so cat.df stays parallel with self.df
                 cat.df = cat.df.iloc[indices]
@@ -911,7 +919,7 @@ class catalogue(object):
                 if join_type == '1and2':
                     matched_df = pd.concat([self.df,cat.df,sepdf],axis=1,join='inner')
                 elif join_type == '1':
-                    matched_df = pd.concat([self.df,cat.df,sepdf],axis=1,join_axes=[self.df.index])
+                    matched_df = pd.concat([self.df,cat.df,sepdf],axis=1)#,join_axes=[self.df.index])
 
                 #reset indices and overwrite data frame with matched one
                 matched_df = matched_df.reset_index(drop=True)
@@ -921,13 +929,13 @@ class catalogue(object):
                 self.write_df(write,filename)
 
             else:
-                print '{0} cross-matches between {1} and {2}. Catalogue unchanged.'.format(len(indices),self.name,cat.name)
+                print('{0} cross-matches between {1} and {2}. Catalogue unchanged.'.format(len(indices),self.name,cat.name))
                 return
 
         #if file exists, simply read in catalogue
         else:
-            print "'{0}' already exists. Skipping cross-matching step.".format(filename)
-            print 'Setting catalogue to this file.'
+            print("'{0}' already exists. Skipping cross-matching step.".format(filename))
+            print('Setting catalogue to this file.')
             matched_df = pd.read_csv(filename)
 
         #update basename to this cross-matched catalogue
@@ -941,7 +949,7 @@ class catalogue(object):
         self.set_key_fields(cat=cat)
 
 
-    def fit_spectra(self,cat_name=None,match_perc=0,models=['pow'],fig_extn=None,GLEAM_subbands=None,GLEAM_nchans=None,fit_flux=False,redo=False,write=True):
+    def fit_spectra(self,cat_name=None,match_perc=0,models=['pow'],fig_extn=None,GLEAM_subbands=None,GLEAM_nchans=None,fit_flux=False,split_model_index=0,DOF=1,redo=False,write=True):
 
         """Derive radio spectra for this catalogue, using the input SED models. This will add new columns to the table, including the spectral index
         and error, and optionally, the fitted flux at the frequency of this instance and the ratio between this and the measured flux.
@@ -965,6 +973,10 @@ class catalogue(object):
             Average together this many 8 MHz GLEAM sub-bands. Use None for no averaging.
         fit_flux : bool
             Use all cross-matched catalogues to derive a fitted flux. If False, a typical spectral index of -0.8 will be assumed.
+        split_model_index : int
+            Split the SED into two (e.g. power-law) models over different frequencies, at this index.
+        DOF : int
+            Degrees of freedom needed to include a model.
         redo : bool
             Derive spectral indices, even if the file exists and the spectral indices have been derived from these frequencies.
         write : bool
@@ -983,9 +995,9 @@ class catalogue(object):
         #when no cat name is given, use all available fluxes
         if cat_name in [None,'all']:
 
-            print "-----------------------------"
-            print "| Deriving spectral indices |"
-            print "-----------------------------"
+            print("-----------------------------")
+            print("| Deriving spectral indices |")
+            print("-----------------------------")
 
             #derive the number of frequencies used to measure spectral
             #indices, and store these for column names and for output
@@ -1004,7 +1016,7 @@ class catalogue(object):
                 count = self.count[cat]
 
                 #Catalogue not considered useful if less than input % of sources have matches
-                if cat != self.name and count > (match_perc/100)*self.count[self.name]:
+                if (cat != self.name or cat_name == 'all') and count > (match_perc/100)*self.count[self.name]:
                     num_cats += 1
                     used_cats += "{0}, ".format(cat)
 
@@ -1020,18 +1032,18 @@ class catalogue(object):
 
             #don't derive spectral indices if there aren't 2+ catalogues to use,
             #but just derive flux at given frequency from a typical spectral index
-            if (num_cats <= 1 or not fit_flux) and self.name in self.flux.keys() and (redo or best_fitted_flux not in self.df.columns):
+            if (num_cats <= 1 or not fit_flux) and self.name in list(self.flux.keys()) and (redo or best_fitted_flux not in self.df.columns):
                 self.est_fitted_flux(best_fitted_flux,best_fitted_ratio,freq,max_cat)
 
             #otherwise, derive the spectral index and fitted flux using all available frequencies
-            elif num_cats > 1 and (redo or best_fitted_flux not in self.df.columns):
+            elif num_cats > 2 and (redo or best_fitted_flux not in self.df.columns):
                 self.n_point_spectra(fitted_flux_suffix,fitted_ratio_suffix,best_fitted_flux,best_fitted_ratio,used_cats,freq,
-                                     models=models,fig_extn=fig_extn,GLEAM_subbands=GLEAM_subbands,GLEAM_nchans=GLEAM_nchans,redo=redo)
+                                     cat_name=cat_name,models=models,fig_extn=fig_extn,GLEAM_subbands=GLEAM_subbands,GLEAM_nchans=GLEAM_nchans,split_model_index=split_model_index,DOF=DOF,redo=redo)
 
         #otherwise derive the spectral index between this instance
         #and the given catalogue, if any cross-matches were found
         elif cat_name in self.cat_list:
-            self.two_point_spectra(cat_name,redo)
+            self.two_point_spectra(self.name,cat_name,redo)
 
         #write catalogue to file
         self.write_df(write,filename)
@@ -1058,12 +1070,12 @@ class catalogue(object):
             The assumed spectral index."""
 
         if self.verbose:
-            print "Deriving the flux at {0} MHz assuming a typical spectral index of {1}.".format(freq,spec_index)
+            print("Deriving the flux at {0} MHz assuming a typical spectral index of {1}.".format(freq,spec_index))
 
         self.df[fitted_flux_col] = flux_at_freq(self.freq[self.name],self.freq[cat],self.flux[cat],spec_index)
         self.df[fitted_ratio_col] = self.flux[self.name] / self.df[fitted_flux_col]
 
-    def two_point_spectra(self,cat_name,redo=False):
+    def two_point_spectra(self,cat_name1,cat_name2,redo=False):
 
         """Derive the spectral index, uncertainty and fitted flux between two frequencies.
 
@@ -1077,23 +1089,23 @@ class catalogue(object):
         redo : bool
             Derive spectral indices, even if the file exists and the spectral indices have been derived from these frequencies."""
 
-        alpha_col = '{0}_{1}_alpha'.format(self.name,cat_name)
+        alpha_col = '{0}_{1}_alpha'.format(cat_name1,cat_name2)
         alpha_err_col = '{0}_err'.format(alpha_col)
 
         if redo or alpha_col not in self.df.columns:
-            #don't derive spectral indices if frequencies are <10% apart
-            if np.abs(self.freq[cat_name]/self.freq[self.name]-1) <= 0.1:
-                print "{0} and {1} are too close to derive spectral indices.".format(self.name,cat_name)
+            #don't derive spectral indices if frequencies are <5% apart
+            if np.abs(self.freq[cat_name1]/self.freq[cat_name2]-1) <= 0.05:
+                print("{0} and {1} are too close to derive spectral indices.".format(cat_name1,cat_name2))
             else:
-                print "Deriving spectral indices between {0} and {1}.".format(self.name,cat_name)
-                self.df[alpha_col],self.df[alpha_err_col],flux = two_freq_power_law(self.freq[self.name],
-                                                                                    [self.freq[self.name],self.freq[cat_name]],
-                                                                                    [self.flux[self.name],self.flux[cat_name]],
-                                                                                    [self.flux_err[self.name],self.flux_err[cat_name]])
+                print("Deriving spectral indices between {0} and {1}.".format(cat_name1,cat_name2))
+                self.df[alpha_col],self.df[alpha_err_col],flux = two_freq_power_law(self.freq[cat_name1],
+                                                                                    [self.freq[cat_name1],self.freq[cat_name2]],
+                                                                                    [self.flux[cat_name1],self.flux[cat_name2]],
+                                                                                    [self.flux_err[cat_name1],self.flux_err[cat_name2]])
 
 
     def n_point_spectra(self,fitted_flux_suffix,fitted_ratio_suffix,best_fitted_flux,best_fitted_ratio,used_cats,freq,
-                        cat_name=None,models=['pow'],fig_extn=None,GLEAM_subbands=None,GLEAM_nchans=None,redo=False):
+                        cat_name=None,models=['pow'],fig_extn=None,GLEAM_subbands=None,GLEAM_nchans=None,split_model_index=0,DOF=1,redo=False):
 
         """Derive the radio spectra from the input SED models, using the specified data, presumed to be >2 frequency measurements.
 
@@ -1126,17 +1138,23 @@ class catalogue(object):
             'peak' for peak fluxes, and None to use none.
         GLEAM_nchans : int
             Average together this many 8 MHz GLEAM sub-bands. Use None for no averaging.
+        split_model_index : int
+            Split the SED into two (e.g. power-law) models over different frequencies, at this index.
+        DOF : int
+            Degrees of freedom needed to include a model.
         redo : bool
             Derive spectral indices, even if the file exists and the spectral indices have been derived from these frequencies."""
 
-        print "Deriving SEDs using following catalogues: {0}.".format(used_cats[:-2])
-        print "Deriving the flux for each model at {0} MHz.".format(freq)
+        print("Deriving SEDs using following catalogues: {0}.".format(used_cats[:-2]))
+        print("Deriving the flux for each model at {0} MHz.".format(freq))
 
         for col in [best_fitted_flux,best_fitted_ratio]:
             self.df[col] = np.full(len(self.df),np.nan)
 
         if fig_extn is not None and self.verbose:
-            print "Writting SED plots to 'SEDs/'"
+            print("Writting SED plots to 'SEDs/'")
+
+        figure = None
 
         #iterate through all sources and derive SED model where possible
         for i in range(len(self.df)):
@@ -1144,7 +1162,7 @@ class catalogue(object):
 
             #iterate through all catalogues and only take fluxes
             #that aren't nan and optionally don't include main catalogue
-            for cat in self.flux.keys():
+            for cat in list(self.flux.keys()):
                 flux = self.flux[cat].iloc[i]
                 if not np.isnan(flux) and (cat != self.name or cat_name == 'all'):
                     fluxes=np.append(fluxes,flux)
@@ -1181,61 +1199,74 @@ class catalogue(object):
                 fluxes = np.append(fluxes,GLEAM_fluxes)
                 errs = np.append(errs,GLEAM_errs)
 
-            #attempt to fit models if more than one frequency
-            if len(freqs) > 1:
-                figname = fig_extn
-                #use island ID or otherwise row index for figure name
-                if figname is not None:
-                    if self.island_col is not None:
-                        name = self.df.loc[i,self.island_col]
-                    else:
-                        name = i
-                    figname = '{0}.{1}'.format(name,figname)
-                #fit SED models
-                mods,names,params,errors,fluxes,rcs,BICs = SED(self.freq[self.name],freqs,fluxes,errs,models,figname=figname)
+            for freqs_split,fluxes_split,errs_split in ((freqs[:split_model_index],fluxes[:split_model_index],errs[:split_model_index]),(freqs[split_model_index:],fluxes[split_model_index:],errs[split_model_index:])):
 
-                #append best fitted flux and ratio
-                if len(mods) > 0:
-                    best_flux = fluxes[np.where(BICs == min(BICs))[0][0]]
-                    self.df.loc[i,best_fitted_flux] = best_flux
-                    if self.name in self.flux.keys():
-                        self.df.loc[i,best_fitted_ratio] = best_flux / self.flux[self.name][i]
+                #attempt to fit models if more than one frequency
+                if len(freqs_split) > 1:
+                    figname = fig_extn
+                    #use island ID or otherwise row index for figure name
+                    if figname is not None:
+                        if self.island_col is not None:
+                            name = self.df.loc[i,self.island_col]
+                        else:
+                            name = i
+                        figname = '{0}.{1}'.format(name,figname)
+                    #fit SED models
+                    mods,names,params,errors,fluxes,rcs,BICs,figure = SED(self.freq[self.name],freqs_split,fluxes_split,errs_split,models,figname=figname,figure=figure,DOF=DOF)
 
-                #iterate through each model and append fitted parameters
-                for j,model in enumerate(mods):
+                    #append best fitted flux and ratio
+                    if len(mods) > 0:
+                        best_flux = fluxes[np.where(BICs == min(BICs))[0][0]]
+                        self.df.loc[i,best_fitted_flux] = best_flux
+                        if self.name in list(self.flux.keys()):
+                            self.df.loc[i,best_fitted_ratio] = best_flux / self.flux[self.name][i]
 
-                    fitted_flux_col = model + fitted_flux_suffix
-                    fitted_ratio_col = model + fitted_ratio_suffix
-                    rcs_col = model + '_rcs'
-                    BIC_col = model + '_BIC'
+                    #iterate through each model and append fitted parameters
+                    for j,model in enumerate(mods):
 
-                    for col in [fitted_flux_col,fitted_ratio_col,rcs_col,BIC_col]:
-                        if col not in self.df.columns:
-                            self.df[col] = np.full(len(self.df),np.nan)
+                        #Hack to get split power law models working!
+                        if split_model_index != 0 and 'pow' in mods:
+                            if figure is not None:
+                                model = 'pow2'
+                            else:
+                                model = 'pow'
 
-                    self.df.loc[i,fitted_flux_col] = fluxes[j]
-                    if self.name in self.flux.keys():
-                        self.df.loc[i,fitted_ratio_col] = fluxes[j] / self.flux[self.name][i]
-                    self.df.loc[i,rcs_col] = rcs[j]
-                    self.df.loc[i,BIC_col] = BICs[j]
+                        fitted_flux_col = model + fitted_flux_suffix
+                        fitted_ratio_col = model + fitted_ratio_suffix
+                        rcs_col = model + '_rcs'
+                        BIC_col = model + '_BIC'
 
-                    for k,name in enumerate(names[j]):
-                        #derive column name for each parameter
-                        para_col = '{0}_{1}'.format(model,name)
-                        para_err_col = '{0}_err'.format(para_col)
+                        for col in [fitted_flux_col,fitted_ratio_col,rcs_col,BIC_col]:
+                            if col not in self.df.columns:
+                                self.df[col] = np.full(len(self.df),np.nan)
 
-                        if para_col not in self.df.columns:
-                            #add new columns for each parameter and uncertainty, the fitted
-                            #flux and the ratio between this and the measured flux
-                            self.df[para_col] = np.full(len(self.df),np.nan)
-                            self.df[para_err_col] = np.full(len(self.df),np.nan)
+                        self.df.loc[i,fitted_flux_col] = fluxes[j]
+                        if self.name in list(self.flux.keys()):
+                            self.df.loc[i,fitted_ratio_col] = fluxes[j] / self.flux[self.name][i]
+                        self.df.loc[i,rcs_col] = rcs[j]
+                        self.df.loc[i,BIC_col] = BICs[j]
 
-                        #store parameter value, error, fitted flux and ratio
-                        self.df.loc[i,para_col] = params[j][k]
-                        self.df.loc[i,para_err_col] = errors[j][k]
+                        for k,name in enumerate(names[j]):
+                            #derive column name for each parameter
+                            para_col = '{0}_{1}'.format(model,name)
+                            para_err_col = '{0}_err'.format(para_col)
+
+                            if para_col not in self.df.columns:
+                                #add new columns for each parameter and uncertainty, the fitted
+                                #flux and the ratio between this and the measured flux
+                                self.df[para_col] = np.full(len(self.df),np.nan)
+                                self.df[para_err_col] = np.full(len(self.df),np.nan)
+
+                            #store parameter value, error, fitted flux and ratio
+                            self.df.loc[i,para_col] = params[j][k]
+                            self.df.loc[i,para_err_col] = errors[j][k]
+
+                else:
+                    plt.close()
+                    figure = None
 
 
-    def process_config_file(self,config_file,main_dir,redo=False,write_all=True,write_any=True,verbose=False):
+    def process_config_file(self,config_file,main_dir,redo=False,write_all=True,write_any=True,verbose=False,filter_dic=None):
 
         """For a given catalogue config file, read the paramaters into a dictionary, pass it into a
         new catalogue object, cut out a box, cross-match to this instance, and derive the spectral index.
@@ -1265,6 +1296,9 @@ class catalogue(object):
 
         #Cut out a box in catalogues within boundaries of image, cross-match and derive spectral indices
         cat.cutout_box(self.ra_bounds,self.dec_bounds,redo=redo,verbose=verbose,write=write_any)
+        # Uncomment to filter reference catalogues according to input filtering config file
+        # if filter_dic is not None:
+        #     cat.filter_sources(**filter_dic)
         self.cross_match(cat,redo=redo,write=write_all)
-        if cat.name in self.cat_list and self.name in self.flux.keys():
+        if cat.name in self.cat_list and self.name in list(self.flux.keys()):
             self.fit_spectra(cat_name=cat.name,redo=redo,write=write_all)

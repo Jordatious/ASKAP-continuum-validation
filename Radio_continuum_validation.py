@@ -3,7 +3,7 @@
 """Input an radio continuum image and produce a validation report (in html) in a directory named after the image, which summarises
 several validation tests/metrics (e.g. astrometry, flux scale, source counts, etc) and whether the data passed or failed these tests.
 
-Last updated: 27/06/2018
+Last updated: 09/11/2022
 
 Usage:
   Radio_continuum_validation.py -h | --help
@@ -42,7 +42,7 @@ Options:
   -c --correct=<level>      Correct the input fits image, write to 'name_corrected.fits' and use this to run through 2nd iteration of validation.
                             Fits image is corrected according to input level (0: none, 1: positions, 2: positions + fluxes) [default: 0]."""
 
-from __future__ import division
+
 from docopt import docopt
 import os
 import sys
@@ -79,13 +79,13 @@ from report import report
 
 #find directory that contains all the necessary files
 main_dir = args['--main-dir']
-if main_dir.startswith('$ACES') and 'ACES' in os.environ.keys():
+if main_dir.startswith('$ACES') and 'ACES' in list(os.environ.keys()):
     ACES = os.environ['ACES']
     main_dir = main_dir.replace('$ACES',ACES)
 if not os.path.exists('{0}/requirements.txt'.format(main_dir)):
     split = sys.argv[0].split('/')
     script_dir = '/'.join(split[:-1])
-    print "Looking in '{0}' for necessary files.".format(script_dir)
+    print("Looking in '{0}' for necessary files.".format(script_dir))
     if 'Radio_continuum_validation' in split[-1]:
         main_dir = script_dir
     else:
@@ -109,7 +109,7 @@ snr = float(args['--snr'])
 
 if '*' in args['--catalogues']:
     config_files = glob.glob(args['--catalogues'])
-    print config_files
+    print(config_files)
 else:
     config_files = args['--catalogues'].split(',')
 SEDs = args['--SEDs'].split(',')
@@ -143,7 +143,7 @@ if __name__ == "__main__":
     if img is not None:
         changeDir(img,suffix,verbose=verbose)
         img = new_path(img)
-        image = radio_image(img,verbose=verbose,rms_map=noise)
+        image = radio_image(img,verbose=verbose,rms_map=noise,SNR=snr)
 
         #Run BANE if user hasn't input noise map
         if noise is None:
@@ -162,47 +162,49 @@ if __name__ == "__main__":
 
         #Use input catalogue config file
         if verbose:
-            print "Using config file '{0}' for main catalogue.".format(main_cat_config)
+            print("Using config file '{0}' for main catalogue.".format(main_cat_config))
         main_cat_config = find_file(main_cat_config,main_dir,verbose=verbose)
         main_cat_config_dic = config2dic(main_cat_config,main_dir,verbose=verbose)
-        main_cat_config_dic.update({'image' : image, 'verbose' : verbose, 'autoload' : False})
+        main_cat_config_dic.update({'image' : image, 'verbose' : verbose, 'autoload' : False, 'SNR' : snr})
         cat = catalogue(**main_cat_config_dic)
 
     #Filter out sources below input SNR, and set key fields and create report object before
     #filtering catalogue further so source counts can be written for all sources above input SNR
     cat.filter_sources(SNR=snr,redo=redo,write=write_any,verbose=verbose,file_suffix='_snr{0}'.format(snr))
     cat.set_specs(image)
-    myReport = report(cat,main_dir,img=image,verbose=verbose,plot_to=source,redo=redo,src_cnt_bins=nbins,write=write_any)
+    myReport = report(cat,main_dir,img=image,verbose=verbose,plot_to=source,redo=redo,src_cnt_bins=nbins,write=write_any,do_source_counts=True,rms_map=noise)
 
     #use config file for filtering sources if it exists
     if filter_config is not None:
         if verbose:
-            print "Using config file '{0}' for filtering.".format(filter_config)
+            print("Using config file '{0}' for filtering.".format(filter_config))
         filter_dic = config2dic(filter_config,main_dir,verbose=verbose)
         filter_dic.update({'redo' : redo, 'write' : write_all, 'verbose' : verbose})
         cat.filter_sources(**filter_dic)
     else:
-        #Only use reliable point sources for comparison
-        cat.filter_sources(flux_lim=1e-3,ratio_frac=1.4,reject_blends=True,flags=True,psf_tol=1.5,resid_tol=3,redo=redo,write=write_all,verbose=verbose)
+        #Only use reliable (e.g. point) sources for comparison
+        cat.filter_sources(flux_lim=0,ratio_frac=0,ratio_sigma=3,reject_blends=True,flags=True,psf_tol=1.5,resid_tol=3,redo=redo,write=write_all,verbose=verbose)
+        filter_dic=None
 
     #process each catalogue object according to list of input catalogue config files
     #this will cut out a box, cross-match to this instance, and derive the spectral index.
     for config_file in config_files:
         if verbose:
-            print "Using config file '{0}' for catalogue.".format(config_file)
+            print("Using config file '{0}' for catalogue.".format(config_file))
         config_file = config_file.strip() #in case user put a space
         config_file = find_file(config_file,main_dir,verbose=verbose)
-        cat.process_config_file(config_file,main_dir,redo=redo,verbose=verbose,write_all=write_all,write_any=write_any)
+        cat.process_config_file(config_file,main_dir,redo=redo,verbose=verbose,write_all=write_all,write_any=write_any,filter_dic=filter_dic)
 
     #Derive spectral indices using all fluxes except from main catalogue, and derive the flux at this frequency
     if len(cat.cat_list) > 1:
         cat.fit_spectra(redo=redo,models=SEDs,GLEAM_subbands='int',GLEAM_nchans=None,cat_name=None,write=write_any,fit_flux=fit_flux,fig_extn=SEDextn)
+        # cat.fit_spectra(redo=redo,models=SEDs,GLEAM_subbands='int',GLEAM_nchans=5,cat_name='all',write=write_any,fit_flux=fit_flux,fig_extn=SEDextn,split_model_index=2,DOF=0) # Split power law
 
     #Produce validation report for each cross-matched survey
     for cat_name in cat.cat_list[1:]:
         #print "Would validate {0}".format(cat_name)
         if cat.count[cat_name] > 1:
-            myReport.validate(cat.name,cat_name,redo=redo)
+            myReport.validate(cat.name,cat_name,redo=redo,use_rms=True,fit_flux=fit_flux,overlay=True)
 
     #write validation summary table and close html file
     myReport.write_html_end()
@@ -210,6 +212,6 @@ if __name__ == "__main__":
     #correct image
     flux_factor = 1.0
     if level == 2:
-        flux_factor = myReport.metric_val['ratio']
+        flux_factor = myReport.metric_val['Flux Ratio']
     if level in (1,2):
-        image.correct_img(myReport.metric_val['dRA'],myReport.metric_val['dDEC'],flux_factor=flux_factor)
+        image.correct_img(myReport.metric_val['RA Offset'],myReport.metric_val['DEC Offset'],flux_factor=flux_factor)
