@@ -171,6 +171,7 @@ class radio_image(object):
 
         #Get the area and solid angle from all non-nan pixels in this image
         self.area,self.solid_ang = get_pixel_area(fits, nans=True, ra_axis=self.ra_axis, dec_axis=self.dec_axis, w=w)
+        self.w = w
 
         #store the RA/DEC of the image as centre pixel and store image vertices
         naxis1 = int(head['NAXIS1'])

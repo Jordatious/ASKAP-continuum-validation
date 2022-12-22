@@ -3,11 +3,11 @@
 """Input an ASKAP continuum image and produce a validation report (in html) in a directory named after the image, which summarises
 several validation tests/metrics (e.g. astrometry, flux scale, source counts, etc) and whether the data passed or failed these tests.
 
-Last updated: 09/11/2022
+Last updated: 20/12/2022
 
 Usage:
   ASKAP_continuum_validation.py -h | --help
-  ASKAP_continuum_validation.py [-S --Selavy=<cat>] [-N --noise=<map>] [-C --catalogues=<list>] [-F --filter=<config>] [-R --snr=<ratio>]
+  ASKAP_continuum_validation.py [-S --Selavy=<cat>] [-N --noise=<map>] [-u --raw=<map>] [-C --catalogues=<list>] [-F --filter=<config>] [-R --snr=<ratio>]
   [-v --verbose] [-f --refind] [-r --redo] [-p --peak-flux] [-w --write] [-x --no-write] [-m --SEDs=<models>] [-e --SEDfig=<extn>]
   [-d --main-dir=<path>] [-n --ncores=<num>] [-b --nbins=<num>] [-s --source=<src>] [-a --aegean-params] <fits-file>
 
@@ -18,6 +18,7 @@ Options:
   -h --help                 Show this help message.
   -S --Selavy=<cat>         Use this Selavy catalogue of the input ASKAP image. Default is to run Aegean [default: None].
   -N --noise=<map>          Use this fits image of the local rms. Default is to run BANE [default: None].
+  -u --raw=<map>            Raw (unconvolved) ASKAP image containing the table (HDU 1) of PSF axes per beam [default: None].
   -C --catalogues=<list>    A comma-separated list of filepaths to catalogue config files corresponding to catalogues to use
                             (will look in --main-dir for each file not found in given path) [default: RACS-low_config.txt].
   -F --filter=<config>      A config file for filtering the sources in the ASKAP catalogue [default: None].
@@ -113,6 +114,7 @@ if not write_any:
 filter_config = new_path(parse_string(args['--filter']))
 selavy_cat = new_path(parse_string(args['--Selavy']))
 noise = new_path(parse_string(args['--noise']))
+raw = new_path(parse_string(args['--raw']))
 
 if __name__ == "__main__":
 
@@ -151,7 +153,7 @@ if __name__ == "__main__":
     #catalogue further so specs and source counts can be written for all sources above input SNR
     AKcat.filter_sources(SNR=snr,flags=True,redo=redo,write=write_any,verbose=verbose,file_suffix='_snr{0}'.format(snr))
     AKcat.set_specs(AK)
-    AKreport = report(AKcat,main_dir,img=AK,verbose=verbose,plot_to=source,redo=redo,src_cnt_bins=nbins,write=write_any,do_source_counts=True,rms_map=noise)
+    AKreport = report(AKcat,main_dir,img=AK,raw_img=raw,verbose=verbose,plot_to=source,redo=redo,src_cnt_bins=nbins,write=write_any,do_source_counts=True,rms_map=noise)
 
     #use config file for filtering sources if it exists
     if filter_config is not None:

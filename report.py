@@ -31,7 +31,7 @@ WARN = '\n\033[91mWARNING: \033[0m' + getframeinfo(cf).filename
 
 class report(object):
 
-    def __init__(self,cat,main_dir,img=None,plot_to='html',css_style=None,fig_font={'fontname':'Serif', 'fontsize' : 18},fig_size={'figsize' : (8,8)},
+    def __init__(self,cat,main_dir,img=None,raw_img=None,plot_to='html',css_style=None,fig_font={'fontname':'Serif', 'fontsize' : 18},fig_size={'figsize' : (8,8)},
                  label_size={'labelsize' : 12},markers={'s' : 20, 'linewidth' : 1, 'marker' : 'o', 'color' : 'b'},
                  colour_markers={'marker' : 'o', 's' : 30, 'linewidth' : 0},cmap='plasma',cbins=20,
                  arrows={'color' : 'r', 'width' : 0.01, 'scale' : 30},src_cnt_bins=50,rms_map=None,redo=False,do_source_counts=False,write=True,verbose=True):
@@ -88,6 +88,7 @@ class report(object):
 
         self.cat = cat
         self.img = img
+        self.raw_img = raw_img
         self.plot_to = plot_to
         self.fig_font = fig_font
         self.fig_size = fig_size
@@ -196,6 +197,7 @@ class report(object):
                             ('Resolved Fraction' , self.cat.resolved_frac),
                             ('Spectral Index' , 0),
                             ('RMS', self.cat.img_rms),
+                            ('Bad beams', self.num_bad_beams),
                             ('Source Counts Reduced Chi-squared' , -99), #self.sc_red_chi_sq
                             ('RA Offset' , 0),
                             ('DEC Offset' , 0)]
@@ -271,14 +273,15 @@ class report(object):
                             img.centre,
                             img.freq))
 
+        header = ''
+        data = ''
         if img.soft_version != '':
-            header = """<th>ASKAPsoft<br>version</th>
+            header += """<th>ASKAPsoft<br>version</th>
             <th>Pipeline<br>version</th>"""
-            data = """<td>{0}</td>
+            data += """<td>{0}</td>
             <td>{1}</td>""".format(img.soft_version,img.pipeline_version)
-        else:
-            header = ''
-            data = ''
+        if self.raw_img is not None:
+            header += '\n<th>Number of<br>bad beams</th>'
 
         #Write image report table
         self.html.write("""
@@ -294,17 +297,18 @@ class report(object):
                 <th>Sky Area<br>(deg<sup>2</sup>)</th>
             </tr>
             <tr>
-                {2}
-                <td>{3:.1f} x {4:.1f}</td>
-                <td>{5}</td>
-                <td>{6:.2f}</td>
-                <td>{7:.0E}</td>
-                <td>{8:.2f}</td>
+                {2}""".format(img.name,header,data))
+
+        self.PSFs(self.raw_img)
+
+        self.html.write("""
+                <td>{0:.1f} x {1:.1f}</td>
+                <td>{2}</td>
+                <td>{3:.2f}</td>
+                <td>{4:.0E}</td>
+                <td>{5:.2f}</td>
             </tr>
-        </table>""".format( img.name,
-                            header,
-                            data,
-                            img.bmaj,
+        </table>""".format( img.bmaj,
                             img.bmin,
                             self.cat.img_rms,
                             self.cat.img_peak,
@@ -447,6 +451,10 @@ class report(object):
                     good_condition = self.metric_val[metric] < 100
                     uncertain_condition = self.metric_val[metric] < 500
                     self.metric_source[metric] = 'Median image R.M.S. (uJy) from noise map'
+                elif metric == 'Bad beams':
+                    good_condition = self.metric_val[metric] == 0
+                    uncertain_condition = self.metric_val[metric] > 0
+                    self.metric_source[metric] = 'Number of raw PSFs with major axis above convolved beam size'
                 #if unknown metric, set it to 3 (bad)
                 else:
                     good_condition = False
@@ -518,15 +526,16 @@ class report(object):
         self.assign_metric_levels()
 
         #flag if in-band spectral indices not derived
-        spec_index = False
-        if 'Spectral Index' in list(self.metric_val.keys()):
-            spec_index = True
+        spec_index = 'Spectral Index' in list(self.metric_val.keys())
 
         if spec_index:
             self.html.write('<th>Median in-band<br>spectral index</th>')
 
         if do_source_counts:
             self.html.write('<th>Source Counts &#967;<sub>red</sub><sup>2</sup><br>({0})</th>'.format(self.cat.name))
+
+        if self.raw_img is not None:
+            self.html.write('<th>Number of bad<br>beams ({0})</th>'.format(self.cat.name))
 
         #Write table with values of metrics and colour them according to level
         self.html.write("""</tr>
@@ -551,6 +560,10 @@ class report(object):
         if do_source_counts:
             self.html.write('<td {0}>{1:.2f}</td>'.format(self.html_colour(self.metric_level['Source Counts Reduced Chi-squared']),
                                                         self.metric_val['Source Counts Reduced Chi-squared']))
+
+        if self.raw_img is not None:
+            self.html.write('<td {0}>{1}</td>'.format(self.html_colour(self.metric_level['Bad beams']),
+                                                        self.metric_val['Bad beams']))
 
         by = ''
         if self.cat.name != 'ASKAP':
@@ -693,7 +706,7 @@ class report(object):
         if self.plot_to != 'screen':
             filename = '{0}/{1}_int_peak_ratio.{2}'.format(self.figDir,self.cat.name,self.plot_to)
         else:
-            filename = ''
+            filename = 'screen'
 
         #get non-nan data shared between each used axis as a numpy array
         x,y,c,indices = self.shared_indices(xaxis,yaxis=ratio)#,caxis=self.cat.dec[self.cat.name])
@@ -749,6 +762,7 @@ class report(object):
         fig = plt.figure(**self.fig_size)
         plt.xlim(-3,2)
         title = "{0} in-band Spectral Index".format(self.cat.name)
+        filename = 'screen'
         if self.plot_to != 'screen':
             filename = '{0}/{1}_in_band_spectal_index.{2}'.format(self.figDir,self.cat.name,self.plot_to)
 
@@ -789,6 +803,77 @@ class report(object):
                   redo=self.redo)
 
         self.html.write("""</td>""")
+
+    def PSFs(self,raw_img,threshold=15,overlay=False):
+
+        """Plot the PSFs per beam."""
+
+        self.num_bad_beams = 0
+
+        if raw_img is not None:
+            #plot the PSFs per beam
+            fig = plt.figure(**self.fig_size)
+            title = "{0} PSFs per beam".format(self.cat.name)
+            filename = 'screen'
+            if self.plot_to != 'screen':
+                filename = '{0}/{1}_PSFs.{2}'.format(self.figDir,self.cat.name,self.plot_to)
+
+            psf_table = fits.open(raw_img)[1].data
+            RAs = psf_table['RA']
+            if np.all(RAs < 0):
+                RAs += 360
+
+            #get non-nan data shared between each used axis as a numpy array
+            x,y,c,indices = self.shared_indices(RAs,yaxis=psf_table['Dec'])
+            xlabel = 'RA (deg)'
+            ylabel = 'Dec (deg)'
+
+            ellipses=[]
+            for i in range(psf_table['BMAJ'].size):
+                if psf_table['BMAJ'][i] > threshold:
+                    color = 'red'
+                else:
+                    color = 'black'
+                e = Ellipse((psf_table['RA'][i],psf_table['DEC'][i]),width=2*psf_table['BMAJ'][i]/60.0,height=2*psf_table['BMIN'][i]/60.0,angle=psf_table['BPA'][i],color=color,fill=False,zorder=10,linewidth=3)
+                ellipses.append(e)
+
+            ellipses.append(Ellipse((axis_lim(psf_table['RA'],min,0.5),axis_lim(psf_table['Dec'],min,0.5)),width=2*threshold/60.0,height=2*threshold/60.0,color='blue',fill=False,zorder=10,linewidth=3))
+
+            #number of beams with BMAJ over threshold (assuming BMIN always < BMAJ)
+            num_bad_beams = np.where(psf_table['BMAJ'] > threshold)[0].size
+            self.num_bad_beams = num_bad_beams
+
+            #derive the statistics of x and store in string
+            BMAJ_med,BMAJ_mean,BMAJ_std,BMAJ_err,BMAJ_mad = get_stats(psf_table['BMAJ'])
+            txt = 'Number of beams before convolution with PSF > {0} arcsec: {1}\n'.format(threshold,num_bad_beams)
+            txt += '$\widetilde{BMAJ}$: %.2f\n' % BMAJ_med
+            txt += '$\overline{BMAJ}$: %.2f\n' % BMAJ_mean
+
+            labels = ['{0:.1f} x {1:.1f}"'.format(BMAJ,BMIN) for BMAJ,BMIN in zip(psf_table['BMAJ'],psf_table['BMIN'])]
+            #leg_labels = ['Good beams','Bad beams','Convolved beam']
+
+            #write the number of bad beams to html report table
+            self.html.write("""<td>{0}<br>""".format(num_bad_beams))
+
+            #plot the PSFs per beam
+            self.plot(x,
+                      y=y,
+                      figure=fig,
+                      title=title,
+                      xlabel=xlabel,
+                      ylabel=ylabel,
+                      ellipses=ellipses,
+                      axis_perc=1,
+                      alpha=0.0,
+                      filename=filename,
+                      text=txt,
+                      loc='tl',
+                      labels=labels,
+                      overlay=overlay,
+                      projection=self.img.w,
+                      redo=self.redo)
+
+            self.html.write("""</td>""")
 
 
     def source_counts(self,fluxes,freq,rms_map=None,solid_ang=0,overlay=False,write=True):
@@ -1247,7 +1332,7 @@ class report(object):
 
 
     def plot(self,x,y=None,c=None,yerr=None,figure=None,arrows=None,line_funcs=None,title='',labels=None,text=None,reverse_x=False,
-             xlabel='',ylabel='',clabel='',leg_labels=[],handles=[],loc='bl',ellipses=None,axis_perc=10,filename='screen',overlay=True,redo=False):
+             xlabel='',ylabel='',clabel='',leg_labels=[],handles=[],loc='bl',ellipses=None,axis_perc=10,alpha=1.0,annotate='',projection=None,filename='screen',overlay=True,redo=False):
 
         """Create and write a scatter plot of the data from an input x axis, and optionally, a y and colour axis.
         This function assumes shared_indices() has already been called and all input axes are equal in length and the same data type.
@@ -1320,13 +1405,14 @@ class report(object):
                 #open html file for plot
                 if 'html' in filename:
                     html_fig = open(filename,'w')
+                    projection = None #RA / Dec axes don't work with mpld3
                 #use figure passed in or create new one
                 if figure is not None:
                     fig = figure
                 else:
                     fig = plt.figure(**self.fig_size)
 
-                ax = plt.subplot(111)
+                ax = plt.subplot(111,projection=projection)
                 norm = None
 
                 #plot histogram
@@ -1351,17 +1437,21 @@ class report(object):
                     #have to use ax.plot() since ax.scatter() has problems (https://github.com/mpld3/mpld3/issues/227)
                     #hack to display html labels when line or ellipse overlaid
                     ax.plot(x,y,'o',zorder=20,alpha=0.0,**markers)
-                    data, = ax.plot(x,y,'o',**markers)
+                    data, = ax.plot(x,y,'o',alpha=alpha,**markers)
                     handles.append(data)
+                    if annotate != '':
+                        ax.annotate(annotate,(x,y))
                 #plot scatter of data points with colour axis
                 else:
                     #normalise the colour bar so each bin contains equal number of data points
                     norm = colors.BoundaryNorm(np.percentile(c,np.linspace(0,100,self.cmap.N+1)),self.cmap.N)
-                    data = ax.scatter(x,y,c=c,cmap=self.cmap,norm=norm,**self.colour_markers)
+                    data = ax.scatter(x,y,c=c,cmap=self.cmap,norm=norm,alpha=alpha,**self.colour_markers)
                     cbar = plt.colorbar(data)
                     cbar.ax.tick_params(**self.label_size)
                     cbar.set_label(clabel,**self.fig_font)
                     data = ax.scatter(x,y,c=c,cmap=self.cmap,zorder=20,alpha=0.0,norm=norm,**self.colour_markers) #same hack as above
+                    if annotate != '':
+                        ax.annotate(annotate,(x,y))
                 #plot error bars and add to list of handles
                 if yerr is not None:
                     err_data = ax.errorbar(x,y,yerr=yerr,zorder=4,linestyle='none',marker=self.markers['marker'],color=self.markers['color'])
@@ -1651,6 +1741,7 @@ class report(object):
                   filename=filename,
                   labels=labels,
                   overlay=overlay,
+                  projection=self.img.w,
                   redo=redo)
 
         #derive column names and check if they exist
@@ -1916,6 +2007,7 @@ class report(object):
                       filename=filename,
                       labels=labels,
                       overlay=overlay,
+                      projection=self.img.w,
                       redo=redo)
 
         #derive spectral index column name and check if exists
