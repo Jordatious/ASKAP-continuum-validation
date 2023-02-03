@@ -3,11 +3,11 @@
 """Input an ASKAP continuum image and produce a validation report (in html) in a directory named after the image, which summarises
 several validation tests/metrics (e.g. astrometry, flux scale, source counts, etc) and whether the data passed or failed these tests.
 
-Last updated: 20/12/2022
+Last updated: 03/02/2023
 
 Usage:
   ASKAP_continuum_validation.py -h | --help
-  ASKAP_continuum_validation.py [-S --Selavy=<cat>] [-N --noise=<map>] [-u --raw=<map>] [-C --catalogues=<list>] [-F --filter=<config>] [-R --snr=<ratio>]
+  ASKAP_continuum_validation.py [-S --Selavy=<cat>] [-N --noise=<map>] [-u --raw=<map>] [-l --residual=<map>] [-C --catalogues=<list>] [-F --filter=<config>] [-R --snr=<ratio>]
   [-v --verbose] [-f --refind] [-r --redo] [-p --peak-flux] [-w --write] [-x --no-write] [-m --SEDs=<models>] [-e --SEDfig=<extn>]
   [-d --main-dir=<path>] [-n --ncores=<num>] [-b --nbins=<num>] [-s --source=<src>] [-a --aegean-params] <fits-file>
 
@@ -19,6 +19,7 @@ Options:
   -S --Selavy=<cat>         Use this Selavy catalogue of the input ASKAP image. Default is to run Aegean [default: None].
   -N --noise=<map>          Use this fits image of the local rms. Default is to run BANE [default: None].
   -u --raw=<map>            Raw (unconvolved) ASKAP image containing the table (HDU 1) of PSF axes per beam [default: None].
+  -l --residual=<map>       Selavy component residual ASKAP image for calculating more accurate RMS statistic [default: None].
   -C --catalogues=<list>    A comma-separated list of filepaths to catalogue config files corresponding to catalogues to use
                             (will look in --main-dir for each file not found in given path) [default: RACS-low_config.txt].
   -F --filter=<config>      A config file for filtering the sources in the ASKAP catalogue [default: None].
@@ -115,6 +116,13 @@ filter_config = new_path(parse_string(args['--filter']))
 selavy_cat = new_path(parse_string(args['--Selavy']))
 noise = new_path(parse_string(args['--noise']))
 raw = new_path(parse_string(args['--raw']))
+residual = new_path(parse_string(args['--residual']))
+
+#Lazy add of a few globals to control validation metrics
+do_source_counts = False
+flux_uncertainty = False
+pos_uncertainty = False
+spec_index = True
 
 if __name__ == "__main__":
 
@@ -153,7 +161,7 @@ if __name__ == "__main__":
     #catalogue further so specs and source counts can be written for all sources above input SNR
     AKcat.filter_sources(SNR=snr,flags=True,redo=redo,write=write_any,verbose=verbose,file_suffix='_snr{0}'.format(snr))
     AKcat.set_specs(AK)
-    AKreport = report(AKcat,main_dir,img=AK,raw_img=raw,verbose=verbose,plot_to=source,redo=redo,src_cnt_bins=nbins,write=write_any,do_source_counts=True,rms_map=noise)
+    AKreport = report(AKcat,main_dir,img=AK,raw_img=raw,resid_img=residual,verbose=verbose,plot_to=source,redo=redo,src_cnt_bins=nbins,write=write_any,do_source_counts=True,rms_map=noise)
 
     #use config file for filtering sources if it exists
     if filter_config is not None:
@@ -164,7 +172,7 @@ if __name__ == "__main__":
         AKcat.filter_sources(**filter_dic)
     else:
         #otherwise use default criteria, selecting reliable (e.g. point) sources for comparison
-        AKcat.filter_sources(flux_lim=0.1e-3,ratio_frac=0,ratio_sigma=0,reject_blends=True,flags=True,psf_tol=0,resid_tol=0,
+        AKcat.filter_sources(flux_lim=0.1e-3,ratio_frac=0,ratio_sigma=5,reject_blends=True,flags=True,psf_tol=0,resid_tol=0,
                             redo=redo,write=write_all,verbose=verbose)
 
     #process each catalogue object according to list of input catalogue config files
@@ -187,9 +195,9 @@ if __name__ == "__main__":
 
     #Produce validation report for each cross-matched catalogue
     for cat_name in AKcat.cat_list[1:]:
-        AKreport.validate(AKcat.name,cat_name,redo=redo,fit_flux=fit_flux)
+        AKreport.validate(AKcat.name,cat_name,redo=redo,fit_flux=fit_flux,flux_uncertainty=flux_uncertainty,pos_uncertainty=pos_uncertainty,spec_index=spec_index)
 
     #write file with RA/DEC offsets for ASKAPsoft pipeline
     #and append validation metrics to html file and then close it
     AKreport.write_pipeline_offset_params()
-    AKreport.write_html_end()
+    AKreport.write_html_end(do_source_counts=do_source_counts,flux_uncertainty=flux_uncertainty,pos_uncertainty=pos_uncertainty,spec_index=spec_index)

@@ -31,7 +31,7 @@ WARN = '\n\033[91mWARNING: \033[0m' + getframeinfo(cf).filename
 
 class report(object):
 
-    def __init__(self,cat,main_dir,img=None,raw_img=None,plot_to='html',css_style=None,fig_font={'fontname':'Serif', 'fontsize' : 18},fig_size={'figsize' : (8,8)},
+    def __init__(self,cat,main_dir,img=None,raw_img=None,resid_img=None,plot_to='html',css_style=None,fig_font={'fontname':'Serif', 'fontsize' : 18},fig_size={'figsize' : (8,8)},
                  label_size={'labelsize' : 12},markers={'s' : 20, 'linewidth' : 1, 'marker' : 'o', 'color' : 'b'},
                  colour_markers={'marker' : 'o', 's' : 30, 'linewidth' : 0},cmap='plasma',cbins=20,
                  arrows={'color' : 'r', 'width' : 0.01, 'scale' : 30},src_cnt_bins=50,rms_map=None,redo=False,do_source_counts=False,write=True,verbose=True):
@@ -89,6 +89,7 @@ class report(object):
         self.cat = cat
         self.img = img
         self.raw_img = raw_img
+        self.resid_img = resid_img
         self.plot_to = plot_to
         self.fig_font = fig_font
         self.fig_size = fig_size
@@ -191,14 +192,14 @@ class report(object):
         #spectral index defaults to -99, as there is a likelihood it will not be needed (if Taylor-term imaging is not done)
         #RA and DEC offsets used temporarily and then dropped before final metrics computed
         key_value_pairs = [ ('Flux Ratio' , 0),
-                            ('Flux Ratio Uncertainty' , 0),
+                            ('Flux Ratio Uncertainty' , -111),
                             ('Positional Offset' , 0),
-                            ('Positional Offset Uncertainty' , 0),
+                            ('Positional Offset Uncertainty' , -111),
                             ('Resolved Fraction' , self.cat.resolved_frac),
                             ('Spectral Index' , 0),
                             ('RMS', self.cat.img_rms),
                             ('Bad beams', self.num_bad_beams),
-                            ('Source Counts Reduced Chi-squared' , -99), #self.sc_red_chi_sq
+                            ('Source Counts Reduced Chi-squared' , -111), #self.sc_red_chi_sq
                             ('RA Offset' , 0),
                             ('DEC Offset' , 0)]
 
@@ -300,6 +301,7 @@ class report(object):
                 {2}""".format(img.name,header,data))
 
         self.PSFs(self.raw_img)
+        self.resid_RMS(self.resid_img)
 
         self.html.write("""
                 <td>{0:.1f} x {1:.1f}</td>
@@ -408,11 +410,11 @@ class report(object):
                 self.metric_source.pop(metric)
                 self.metric_level.pop(metric)
             else:
-                #flux ratio within 5/10%?
+                #flux ratio within 10%?
                 if metric == 'Flux Ratio':
                     val = np.abs(self.metric_val[metric]-1)
-                    good_condition = val < 0.05
-                    uncertain_condition = val < 0.1
+                    good_condition = val < 0.1
+                    uncertain_condition = False
                     self.metric_source[metric] = 'Median flux density ratio [ASKAP / {0}]'.format(self.metric_source[metric])
                 #uncertainty on flux ratio less than 10/20%?
                 elif metric == 'Flux Ratio Uncertainty':
@@ -420,10 +422,10 @@ class report(object):
                     uncertain_condition = self.metric_val[metric] < 0.2
                     self.metric_source[metric] = 'R.M.S. of median flux density ratio [ASKAP / {0}]'.format(self.metric_source[metric])
                     self.metric_source[metric] += ' (estimated from median absolute deviation from median)'
-                #positional offset < 1/5 arcsec
+                #positional offset < 2 arcsec
                 elif metric == 'Positional Offset':
-                    good_condition = self.metric_val[metric] < 1
-                    uncertain_condition = self.metric_val[metric] < 5
+                    good_condition = self.metric_val[metric] < 2
+                    uncertain_condition = False
                     self.metric_source[metric] = 'Median positional offset (arcsec) [ASKAP-{0}]'.format(self.metric_source[metric])
                 #uncertainty on positional offset < 1/5 arcsec
                 elif metric == 'Positional Offset Uncertainty':
@@ -436,24 +438,28 @@ class report(object):
                     good_condition = self.metric_val[metric] < 3
                     uncertain_condition = self.metric_val[metric] < 50
                     self.metric_source[metric] = 'Reduced chi-squared of source counts'
-                #resolved fraction of sources between 5-20%?
+                #resolved fraction of sources between 5-30%?
                 elif metric == 'Resolved Fraction':
-                    good_condition = self.metric_val[metric] > 0.05 and self.metric_val[metric] < 0.2
-                    uncertain_condition = self.metric_val[metric] < 0.3
+                    good_condition = self.metric_val[metric] > 0.05 and self.metric_val[metric] < 0.3
+                    uncertain_condition = False
                     self.metric_source[metric] = 'Fraction of sources resolved according to int/peak flux densities'
-                #spectral index less than 0.2 away from -0.8?
+                #spectral index less than 0.1 away from -0.8?
                 elif metric == 'Spectral Index':
                     val = np.abs(self.metric_val[metric]+0.8)
-                    good_condition = val < 0.2
+                    good_condition = val <= 0.1
                     uncertain_condition = False
                     self.metric_source[metric] = 'Median in-band spectral index'
                 elif metric == 'RMS':
-                    good_condition = self.metric_val[metric] < 100
-                    uncertain_condition = self.metric_val[metric] < 500
-                    self.metric_source[metric] = 'Median image R.M.S. (uJy) from noise map'
+                    good_condition = self.metric_val[metric] < 35
+                    uncertain_condition = False
+                    if self.resid_img is not None:
+                        rms_description = 'Image R.M.S. (uJy), calculated from clipped Selavy component residual map'
+                    else:
+                        rms_description = 'Median image R.M.S. (uJy) from noise map'
+                    self.metric_source[metric] = rms_description
                 elif metric == 'Bad beams':
-                    good_condition = self.metric_val[metric] == 0
-                    uncertain_condition = self.metric_val[metric] > 0
+                    good_condition = self.metric_val[metric] < 3
+                    uncertain_condition = False
                     self.metric_source[metric] = 'Number of raw PSFs with major axis above convolved beam size'
                 #if unknown metric, set it to 3 (bad)
                 else:
@@ -502,7 +508,7 @@ class report(object):
         xml_filename = '{0}CASDA_continuum_validation.xml'.format(prefix)
         votable.writeto(vot, xml_filename)
 
-    def write_html_end(self,do_source_counts=False):
+    def write_html_end(self,do_source_counts=False,flux_uncertainty=False,pos_uncertainty=False,spec_index=True):
 
         """Write the end of the html report file (including table of metrics) and close it."""
 
@@ -515,45 +521,54 @@ class report(object):
         <table class="reportTable">
             <tr>
                 <th>Flux Ratio<br>({0} / {1})</th>
-                <th>Flux Ratio Uncertainty<br>({0} / {1})</th>
                 <th>Positional Offset (arcsec)<br>({0} &mdash; {2})</th>
-                <th>Positional Offset Uncertainty (arcsec)<br>({0} &mdash; {2})</th>
+            """.format(self.cat.name,self.metric_source['Flux Ratio'],self.metric_source['Positional Offset']))
+
+        if flux_uncertainty:
+            self.html.write('<th>Flux Ratio Uncertainty<br>({0} / {1})</th>\n'.format(self.cat.name,self.metric_source['Flux Ratio']))
+        if pos_uncertainty:
+            self.html.write('<th>Positional Offset Uncertainty (arcsec)<br>({0} &mdash; {1})</th>\n'.format(self.cat.name,self.metric_source['Positional Offset']))
+
+        self.html.write("""
                 <th>Resolved Fraction from int/peak Flux<br>({0})</th>
                 <th>r.m.s. (uJy)<br>({0})</th>
-            """.format(self.cat.name,self.metric_source['Flux Ratio'],self.metric_source['Positional Offset']))
+                """.format(self.cat.name))
 
         #assign levels to each metric
         self.assign_metric_levels()
 
-        #flag if in-band spectral indices not derived
-        spec_index = 'Spectral Index' in list(self.metric_val.keys())
-
-        if spec_index:
-            self.html.write('<th>Median in-band<br>spectral index</th>')
+        if spec_index and 'Spectral Index' in list(self.metric_val.keys()):
+            self.html.write('<th>Median in-band<br>spectral index</th>\n')
 
         if do_source_counts:
-            self.html.write('<th>Source Counts &#967;<sub>red</sub><sup>2</sup><br>({0})</th>'.format(self.cat.name))
+            self.html.write('<th>Source Counts &#967;<sub>red</sub><sup>2</sup><br>({0})</th>\n'.format(self.cat.name))
 
         if self.raw_img is not None:
-            self.html.write('<th>Number of bad<br>beams ({0})</th>'.format(self.cat.name))
+            self.html.write('<th>Number of bad<br>beams ({0})</th>\n'.format(self.cat.name))
 
         #Write table with values of metrics and colour them according to level
         self.html.write("""</tr>
         <tr>
             <td {0}>{1:.2f}</td>
             <td {2}>{3:.2f}</td>
-            <td {4}>{5:.2f}</td>
-            <td {6}>{7:.2f}</td>
-            <td {8}>{9:.2f}</td>
-            <td {10}>{11}</td>
         """.format(self.html_colour(self.metric_level['Flux Ratio']),self.metric_val['Flux Ratio'],
-                        self.html_colour(self.metric_level['Flux Ratio Uncertainty']),self.metric_val['Flux Ratio Uncertainty'],
-                        self.html_colour(self.metric_level['Positional Offset']),self.metric_val['Positional Offset'],
-                        self.html_colour(self.metric_level['Positional Offset Uncertainty']),self.metric_val['Positional Offset Uncertainty'],
-                        self.html_colour(self.metric_level['Resolved Fraction']),self.metric_val['Resolved Fraction'],
-                        self.html_colour(self.metric_level['RMS']),self.metric_val['RMS']))
+                    self.html_colour(self.metric_level['Positional Offset']),self.metric_val['Positional Offset']))
 
-        if spec_index:
+        if flux_uncertainty:
+            self.html.write('<td {0}>{1:.2f}</td>'.format(self.html_colour(self.metric_level['Flux Ratio Uncertainty']),
+                                                        self.metric_val['Flux Ratio Uncertainty']))
+
+        if pos_uncertainty:
+            self.html.write('<td {0}>{1:.2f}</td>'.format(self.html_colour(self.metric_level['Positional Offset Uncertainty']),
+                                                        self.metric_val['Positional Offset Uncertainty']))
+
+        self.html.write("""
+            <td {0}>{1:.2f}</td>
+            <td {2}>{3}</td>
+        """.format(self.html_colour(self.metric_level['Resolved Fraction']),self.metric_val['Resolved Fraction'],
+                    self.html_colour(self.metric_level['RMS']),self.metric_val['RMS']))
+
+        if spec_index and 'Spectral Index' in list(self.metric_val.keys()):
             self.html.write('<td {0}>{1:.2f}</td>'.format(self.html_colour(self.metric_level['Spectral Index']),
                                                         self.metric_val['Spectral Index']))
 
@@ -874,6 +889,24 @@ class report(object):
                       redo=self.redo)
 
             self.html.write("""</td>""")
+
+    def resid_RMS(self,resid_img,sigma=3.0):
+
+        """Calculate the RMS using the Selavy component residual."""
+
+        if resid_img is not None:
+            img = fits.open(resid_img)
+            dat = img[0].data[~np.isnan(img[0].data)]
+            img.close()
+
+            med = np.median(dat)
+            mad = np.median(np.abs(dat - med))
+            std = 1.4826 * mad
+            mask = np.abs(dat) > med + sigma*std
+            dat = dat[~mask]
+            RMS = np.sqrt(np.mean(dat**2))
+
+            self.cat.img_rms = int(RMS*1e6)
 
 
     def source_counts(self,fluxes,freq,rms_map=None,solid_ang=0,overlay=False,write=True):
@@ -1570,7 +1603,7 @@ class report(object):
         plt.close()
 
 
-    def validate(self,name1,name2,redo=False,use_rms=True,fit_flux=False,overlay=False):
+    def validate(self,name1,name2,redo=False,use_rms=True,fit_flux=False,overlay=False,spec_index=True,flux_uncertainty=False,pos_uncertainty=False):
 
         """Produce a validation report between two catalogues, and optionally produce plots.
 
@@ -2076,20 +2109,26 @@ class report(object):
 
         #create dictionary of validation metrics and where they come from
         metric_val = {  'Flux Ratio' : ratio_med,
-                        'Flux Ratio Uncertainty' : ratio_mad,
                         'RA Offset' : dRAmed,
                         'DEC Offset' : dDECmed,
-                        'Positional Offset' : sep_med,
-                        'Positional Offset Uncertainty' : sep_mad,
-                        'Spectral Index' : alpha_med}
+                        'Positional Offset' : sep_med}
 
         metric_source = {'Flux Ratio' : flux_ratio_type,
-                        'Flux Ratio Uncertainty' : flux_ratio_type,
                         'RA Offset' : name2,
                         'DEC Offset' : name2,
-                        'Positional Offset' : name2,
-                        'Positional Offset Uncertainty' : name2,
-                        'Spectral Index' : alpha_type}
+                        'Positional Offset' : name2}
+
+        if flux_uncertainty:
+            metric_val['Flux Ratio Uncertainty'] = ratio_mad
+            metric_source['Flux Ratio Uncertainty'] = flux_ratio_type
+
+        if pos_uncertainty:
+            metric_val['Positional Offset Uncertainty'] = sep_mad
+            metric_source['Positional Offset Uncertainty'] = name2
+
+        if spec_index:
+            metric_val['Spectral Index'] = alpha_med
+            metric_source['Spectral Index'] = alpha_type
 
         count = self.cat.count[name2]
 

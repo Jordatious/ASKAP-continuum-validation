@@ -3,7 +3,7 @@
 """Input an radio continuum image and produce a validation report (in html) in a directory named after the image, which summarises
 several validation tests/metrics (e.g. astrometry, flux scale, source counts, etc) and whether the data passed or failed these tests.
 
-Last updated: 20/12/2022
+Last updated: 03/02/2023
 
 Usage:
   Radio_continuum_validation.py -h | --help

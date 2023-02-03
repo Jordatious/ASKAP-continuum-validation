@@ -93,9 +93,9 @@ class catalogue(object):
         astropy.coordinates.SkyCoord
         pandas.DataFrame"""
 
-        print("--------------------------")
+        print("--------------------------------")
         print("| Reading {0} catalogue |".format(name))
-        print("--------------------------")
+        print("--------------------------------")
 
         self.verbose = verbose
         self.name = name
@@ -373,7 +373,8 @@ class catalogue(object):
 
         #get median spectral index if column exists
         if self.name in list(self.si.keys()):
-            self.med_si = np.median(self.si[self.name])
+            SI = self.si[self.name]
+            self.med_si = np.median(SI[SI != -99])
         else:
             self.med_si = -99
 
@@ -869,9 +870,9 @@ class catalogue(object):
                     print('No {0} sources to match. Catalogue unchanged.'.format(cat.name))
                 return
 
-            print("---------------------------------")
+            print("---------------------------------------")
             print("| Cross-matching {0} and {1} |".format(self.name,cat.name))
-            print("---------------------------------")
+            print("---------------------------------------")
 
             if redo:
                 print("Re-doing cross-match.")
