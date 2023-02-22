@@ -1,0 +1,43 @@
+Bootstrap: debootstrap
+MirrorURL: http://archive.ubuntu.com/ubuntu/
+OSVersion: bionic
+Include: software-properties-common
+
+%labels
+        APPLICATION_NAME Ubuntu LTS + ASKAP validation
+        OS_VERSION 18.04
+        APPLICATION_URL https://confluence.csiro.au/display/askapsst/Validation
+
+        SYSTEM_NAME Pawsey
+        SYSTEM_SINGULARITY_VERSION 3.8.6
+        SYSTEM_URL https://pawsey.org.au
+
+        AUTHOR_NAME Jordan Collier
+        AUTHOR_EMAIL jordan@idia.ac.za
+
+%post
+
+        export DEBIAN_FRONTEND=noninteractive
+
+        # Installation of initial packages
+        apt-get update -y
+        add-apt-repository -y ppa:deadsnakes/ppa
+        add-apt-repository -y universe
+        apt-get install -y python3.6 python3-pip libjpeg-turbo8
+        update-alternatives --install /usr/bin/python python /usr/bin/python3.6 20
+
+        # Install python packages
+        pip3 install --upgrade pip
+        pip3 install wheel
+        pip3 install astropy docopt matplotlib pandas numpy scipy packaging mpld3
+
+        # Fix command prompt in Singularity 3.5.2
+        printf 'export PS1="\u@$SINGULARITY_NAME:\w$ "' > /.singularity.d/env/999-psvars.sh
+
+        # Cleanup the container
+        apt-get clean
+        apt-get autoclean
+
+%runscript
+
+        python "$@"
