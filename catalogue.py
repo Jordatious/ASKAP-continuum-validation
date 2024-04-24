@@ -659,10 +659,17 @@ class catalogue(object):
 
             #cut out all rows outside RA and DEC boundaries
             if type(ra) is tuple:
-                ra_min,ra_max,dec_min,dec_max = axis_lim(ra,min),axis_lim(ra,max),axis_lim(dec,min),axis_lim(dec,max)
-                if verbose:
-                    print("Selecting sources with {0} <= RA <= {1} and {2} <= DEC <= {3}.".format(ra_min,ra_max,dec_min,dec_max))
-                self.df = self.df[(RA <= ra_max) & (RA >= ra_min) & (DEC <= dec_max) & (DEC >= dec_min)]
+                if max(ra) - min(ra) > 180:
+                    # Assume RA range isn't 180 degrees, but that RA has wrapped over 0 hours, so swap max/min RA:
+                    ra_min,ra_max,dec_min,dec_max = max(ra)*0.9, min(ra)*1.1,axis_lim(dec,min),axis_lim(dec,max)
+                    if verbose:
+                        print("Selecting sources with {0} <= RA <= {1} and {2} <= DEC <= {3}.".format(ra_min,ra_max,dec_min,dec_max))
+                    self.df = self.df[((RA <= 360) & (RA >= ra_min) | ((RA <= ra_max) & (RA >= 0))) & (DEC <= dec_max) & (DEC >= dec_min)]
+                else:
+                    ra_min,ra_max,dec_min,dec_max = axis_lim(ra,min),axis_lim(ra,max),axis_lim(dec,min),axis_lim(dec,max)
+                    if verbose:
+                        print("Selecting sources with {0} <= RA <= {1} and {2} <= DEC <= {3}.".format(ra_min,ra_max,dec_min,dec_max))
+                    self.df = self.df[(RA <= ra_max) & (RA >= ra_min) & (DEC <= dec_max) & (DEC >= dec_min)]
 
             #cut out all rows outside the FOV
             else:
