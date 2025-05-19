@@ -339,6 +339,7 @@ class catalogue(object):
             self.area = img.area
             self.ra_bounds = img.ra_bounds
             self.dec_bounds = img.dec_bounds
+            self.image = img
 
             #Get dynamic range between image and rms map and sum of image flux vs. total catalogue flux
             rms_map = f.open(img.rms_map)[0]
@@ -609,7 +610,7 @@ class catalogue(object):
                 print("Writing to '{0}'.".format(filename))
             self.df.to_csv(filename,index=False)
 
-    def cutout_box(self,ra,dec,fov=10,redo=False,write=True,verbose=True):
+    def cutout_box(self,ra,dec,image=None,fov=10,redo=False,write=True,verbose=True):
 
         """Cut out a box of the catalogue, updating the catalogue to only contain sources within this box.
         Input a central RA and DEC and FOV or four vertices.
@@ -623,6 +624,8 @@ class catalogue(object):
 
         Keyword arguments:
         ------------------
+        image : radio_image
+            A radio image object used to identify the exact vertices.
         fov : float
             The field of view in degrees (i.e. fov*fov degrees). Only used when RA & DEC are single values.
         redo : bool
@@ -657,19 +660,11 @@ class catalogue(object):
                         print("Overwriting '{0}'.".format(filename))
                 print("Cutting out sources from {0}.".format(self.name))
 
-            #cut out all rows outside RA and DEC boundaries
-            if type(ra) is tuple:
-                if max(ra) - min(ra) > 180:
-                    # Assume RA range isn't 180 degrees, but that RA has wrapped over 0 hours, so swap max/min RA:
-                    ra_min,ra_max,dec_min,dec_max = max(ra)*0.9, min(ra)*1.1,axis_lim(dec,min),axis_lim(dec,max)
-                    if verbose:
-                        print("Selecting sources with {0} <= RA <= {1} and {2} <= DEC <= {3}.".format(ra_min,ra_max,dec_min,dec_max))
-                    self.df = self.df[((RA <= 360) & (RA >= ra_min) | ((RA <= ra_max) & (RA >= 0))) & (DEC <= dec_max) & (DEC >= dec_min)]
-                else:
-                    ra_min,ra_max,dec_min,dec_max = axis_lim(ra,min),axis_lim(ra,max),axis_lim(dec,min),axis_lim(dec,max)
-                    if verbose:
-                        print("Selecting sources with {0} <= RA <= {1} and {2} <= DEC <= {3}.".format(ra_min,ra_max,dec_min,dec_max))
-                    self.df = self.df[(RA <= ra_max) & (RA >= ra_min) & (DEC <= dec_max) & (DEC >= dec_min)]
+            if image is not None:
+                coords = SkyCoord(ra = self.df[self.ra_col], dec = self.df[self.dec_col], unit='{0},{1}'.format(self.ra_fmt,self.dec_fmt))
+                x_pixels, y_pixels = image.w.world_to_pixel(coords)
+                mask = (0 < x_pixels) & (x_pixels < image.fits.shape[-1]) & (0 < y_pixels) & (y_pixels < image.fits.shape[-2])
+                self.df = self.df[mask]
 
             #cut out all rows outside the FOV
             else:
@@ -1303,7 +1298,7 @@ class catalogue(object):
         cat = catalogue(**config_dic)
 
         #Cut out a box in catalogues within boundaries of image, cross-match and derive spectral indices
-        cat.cutout_box(self.ra_bounds,self.dec_bounds,redo=redo,verbose=verbose,write=write_any)
+        cat.cutout_box(self.ra_bounds,self.dec_bounds,image=self.image,redo=redo,verbose=verbose,write=write_any)
         # Uncomment to filter reference catalogues according to input filtering config file
         # if filter_dic is not None:
         #     cat.filter_sources(**filter_dic)
